@@ -4,18 +4,40 @@
 	import { enhanceArticle, nextToolbarState } from '#lib/reader-enhancements.ts';
 	import { untrack } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
-	import { ArrowLeft, ExternalLink, Share2, Star, MailOpen, Mail } from '@lucide/svelte';
+	import {
+		ArrowLeft,
+		ChevronLeft,
+		ChevronRight,
+		ExternalLink,
+		Share2,
+		Star,
+		MailOpen,
+		Mail
+	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { shareArticle } from '#lib/share.ts';
 	import { safeOriginalLink } from '#lib/shortcuts.ts';
 	import { listHref } from '#lib/reader-paths.ts';
+	import { moveArticle, preloadNeighbors, readerPosition } from '#lib/shortcut-handler.svelte.ts';
+	import { swipeNavigation, type Step } from '#lib/swipe-navigation.ts';
 	import { isRead, isStarred, updateArticle } from '#lib/reader-state.svelte.ts';
 	import type { ReaderItemData } from '#lib/reader.ts';
 	let { data }: { data: ReaderItemData } = $props();
 	let sharing = $state(false);
 	let cameFromList = $state(false);
 	let selected = $derived(data.selectedItem);
+	let position = $derived(readerPosition());
+	let navigating = false;
+	async function step(direction: Step) {
+		if (navigating) return false;
+		navigating = true;
+		try {
+			return await moveArticle(direction);
+		} finally {
+			navigating = false;
+		}
+	}
 	let original = $derived(safeOriginalLink(selected.link));
 	let backHref = $derived(listHref(data));
 	let image = $state<{ src: string; alt: string; trigger: HTMLElement } | null>(null);
@@ -42,6 +64,9 @@
 	}
 
 	afterNavigate(({ from, type }) => {
+		// Paging to a sibling article replaces the history entry, so the list is still one Back away.
+		if (type === 'goto' && from?.params?.itemId && from.params.itemId !== data.selectedItem.id)
+			return;
 		// Only when the previous history entry is known to be this view's list.
 		cameFromList =
 			(type === 'link' || type === 'goto') &&
@@ -97,14 +122,39 @@
 			if (!event.currentTarget.contains(event.relatedTarget as Node | null)) headerFocused = false;
 		}}
 	>
-		<Button
-			href={backHref}
-			onclick={goBack}
-			variant="ghost"
-			size="sm"
-			class="min-h-11 max-w-full whitespace-normal"
-			><ArrowLeft data-icon="inline-start" />Back to {data.viewTitle}</Button
-		>
+		<div class="reader-nav flex min-w-0 items-center justify-between gap-1">
+			<Button
+				href={backHref}
+				onclick={goBack}
+				variant="ghost"
+				size="sm"
+				class="min-h-11 max-w-full whitespace-normal"
+				><ArrowLeft data-icon="inline-start" />Back to {data.viewTitle}</Button
+			>
+			<div class="flex shrink-0 items-center gap-1">
+				<Button
+					variant="ghost"
+					size="icon"
+					class="min-h-11 min-w-11"
+					aria-label="Previous article"
+					disabled={!position.canPrevious}
+					onclick={() => step(-1)}><ChevronLeft /></Button
+				>
+				{#if position.index >= 0}<span
+						class="px-1 text-sm whitespace-nowrap text-muted-foreground tabular-nums"
+						aria-live="polite"
+						>{position.index + 1} of {position.count}{position.hasMore ? '+' : ''}</span
+					>{/if}
+				<Button
+					variant="ghost"
+					size="icon"
+					class="min-h-11 min-w-11"
+					aria-label="Next article"
+					disabled={!position.canNext}
+					onclick={() => step(1)}><ChevronRight /></Button
+				>
+			</div>
+		</div>
 		<div class="action-slot">
 			<div
 				data-reader-actions
@@ -149,6 +199,12 @@
 			data-reader-scroller
 			class="reader-scroll min-h-0 min-w-0 flex-1 overflow-y-auto"
 			onscroll={trackScroll}
+			{@attach (node) =>
+				swipeNavigation(node, () => ({
+					canStep: (direction) => (direction === 1 ? position.canNext : position.canPrevious),
+					commit: step,
+					warm: preloadNeighbors
+				}))}
 			{@attach () => {
 				collapsed = false;
 				scrollAnchor = 0;
@@ -226,6 +282,7 @@
 		opacity: 0;
 	}
 	.reader-scroll {
+		touch-action: pan-y;
 		overscroll-behavior-y: contain;
 		overflow-x: hidden;
 		scrollbar-gutter: stable;

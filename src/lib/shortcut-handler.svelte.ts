@@ -1,5 +1,5 @@
 import { deserialize } from '$app/forms';
-import { goto, invalidateAll } from '$app/navigation';
+import { goto, invalidateAll, preloadData } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { toast } from 'svelte-sonner';
 import { isRead, isStarred, updateArticle } from '#lib/reader-state.svelte.ts';
@@ -81,31 +81,60 @@ function focusSearch() {
 	void goto(resolve('/(app)/search'));
 }
 
-async function move(direction: 1 | -1) {
+/** Where the open article sits in the list it was opened from (for the toolbar and swipes). */
+export function readerPosition() {
 	const current = context;
-	if (!current) return;
+	const index = current?.selectedId ? current.articleIds.indexOf(current.selectedId) : -1;
+	const count = current?.articleIds.length ?? 0;
+	return {
+		index,
+		count,
+		hasMore: !!current?.hasMore,
+		canPrevious: index > 0,
+		canNext: index >= 0 && (index < count - 1 || !!current?.hasMore)
+	};
+}
+
+/** Warm the neighbors' item data so a swipe or button lands without a spinner. */
+export function preloadNeighbors() {
+	const current = context;
+	if (!current?.selectedId) return;
+	const index = current.articleIds.indexOf(current.selectedId);
+	if (index < 0) return;
+	for (const id of [current.articleIds[index - 1], current.articleIds[index + 1]]) {
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- hrefFor() wraps resolve().
+		if (id) void preloadData(current.hrefFor(id)).catch(() => {});
+	}
+}
+
+/** Open the next (1) or previous (-1) article of the list. Resolves true when it moved. */
+export async function moveArticle(direction: 1 | -1): Promise<boolean> {
+	const current = context;
+	if (!current) return false;
 	let ids = current.articleIds;
 	let index = adjacentIndex(ids, current.selectedId, direction);
 	// At the end of the loaded list: fetch the next page and continue into it.
 	if (index === null && direction === 1 && current.hasMore) {
 		const loaded = await current.loadMore();
-		if (!loaded) return;
+		if (!loaded) return false;
 		ids = loaded;
 		index = adjacentIndex(ids, current.selectedId, direction);
 	}
-	if (index === null) return;
+	if (index === null) return false;
 	// reset: false keeps the list scroll and focus where they are; the workspace scrolls the selected row into view.
+	// replaceState: paging between articles must not add history entries, so Back returns to the list in one step.
 	// eslint-disable-next-line svelte/no-navigation-without-resolve -- hrefFor() wraps resolve().
-	await goto(current.hrefFor(ids[index]), { reset: false });
+	await goto(current.hrefFor(ids[index]), { reset: false, replaceState: !!current.selectedId });
+	return true;
 }
 
 function run(action: ShortcutAction, openHelp: () => void) {
 	const current = context;
 	switch (action) {
 		case 'next':
-			return void move(1);
+			return void moveArticle(1);
 		case 'previous':
-			return void move(-1);
+			return void moveArticle(-1);
 		case 'toggleRead':
 			if (current?.selected)
 				void updateArticle(current.selected, { read: !isRead(current.selected) });
