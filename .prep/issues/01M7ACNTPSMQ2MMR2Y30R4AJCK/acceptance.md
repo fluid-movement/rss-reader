@@ -1,0 +1,5 @@
+- [ ] pnpm db:seed creates the dev user, topic folders and queues the listed real feeds (queueFeed, next_fetch_at now) with no fake items, no fake read/starred state and no example.com URLs; the script itself makes no network requests
+- [ ] Starting the dev server after seeding pulls the feeds through the real scheduler; verified in a browser that items from the majority of the feeds appear (RSS, Atom, RSS 1.0, JSON Feed, gzip/br, redirects, 360 KB feeds) and the dead kottke.org URL shows as a broken feed with a safe error
+- [ ] Feeds marked extract_full_text get full articles extracted for new items; the extraction and search paths work on the real data
+- [ ] Any real-world fetch/parse/render problem found while pulling these feeds (failures, mis-decoded text, broken sanitization, layout problems) is fixed or filed as a prep issue with the failing feed named
+- [ ] The safety guard, idempotent re-seed and tests remain, the README documents that the dev server must be running (and the optional --refresh flag if added), and pnpm check, pnpm test pass
