@@ -1,0 +1,1 @@
+- 2026-11-13T11:00:38Z claude-code: Implemented by sonnet; reviewed by separate sonnet (guard casing/userinfo/DATABASE_URL, hostile fixture, tests moved under src so they run). Password only in scripts/seed-data.ts. justfile seed recipe merged by hand (user's justfile is untracked).

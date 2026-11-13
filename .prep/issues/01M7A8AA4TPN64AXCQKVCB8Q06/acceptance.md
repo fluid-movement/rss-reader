@@ -1,6 +1,6 @@
-- [ ] pnpm db:seed creates the dev user and seeds folders, feeds, items and item state for all current features, without network access
-- [ ] Re-running pnpm db:seed does not duplicate data and leaves a clean, consistent dataset
-- [ ] The script exits with a clear error when NODE_ENV=production or ORIGIN is not localhost, and a test covers this guard
-- [ ] A just seed recipe and a README section exist; no real or personal data is included
-- [ ] After seeding, the app shows unread/read/starred items, folders, and a broken feed in the UI (verified in the dev server)
-- [ ] pnpm check and pnpm test pass
+- [x] pnpm db:seed creates the dev user and seeds folders, feeds, items and item state for all current features, without network access
+- [x] Re-running pnpm db:seed does not duplicate data and leaves a clean, consistent dataset
+- [x] The script exits with a clear error when NODE_ENV=production or ORIGIN is not localhost, and a test covers this guard
+- [x] A just seed recipe and a README section exist; no real or personal data is included
+- [x] After seeding, the app shows unread/read/starred items, folders, and a broken feed in the UI (verified in the dev server)
+- [x] pnpm check and pnpm test pass
