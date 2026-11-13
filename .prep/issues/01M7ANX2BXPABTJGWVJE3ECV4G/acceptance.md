@@ -1,4 +1,4 @@
-- [ ] Long folder and feed names truncate with an ellipsis and the unread count is always fully visible at the sidebar width, on desktop and in the phone drawer
-- [ ] Folders collapse and expand with mouse and keyboard, state persists across reloads (per browser) without a layout flash, and the folder of the active view is expanded
-- [ ] Collapsed folders still show their unread total; counts stay exact after mutations and sync
-- [ ] Verified in a real browser with the real-feed seed (42 feeds) at 1280x800 and 390 px, dark mode too; pnpm check and pnpm test pass
+- [x] Long folder and feed names truncate with an ellipsis and the unread count is always fully visible at the sidebar width, on desktop and in the phone drawer
+- [x] Folders collapse and expand with mouse and keyboard, state persists across reloads (per browser) without a layout flash, and the folder of the active view is expanded
+- [x] Collapsed folders still show their unread total; counts stay exact after mutations and sync
+- [x] Verified in a real browser with the real-feed seed (42 feeds) at 1280x800 and 390 px, dark mode too; pnpm check and pnpm test pass
