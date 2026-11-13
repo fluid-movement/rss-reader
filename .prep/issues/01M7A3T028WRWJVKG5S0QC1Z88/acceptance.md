@@ -1,5 +1,5 @@
-- [ ] Adding a site URL discovers its feed; direct RSS, Atom and JSON Feed URLs parse into items
-- [ ] Duplicate items are not stored twice
-- [ ] Private/loopback addresses are rejected and fetches have timeout and size limits
-- [ ] Folders can be created, renamed, deleted; feeds can be assigned
-- [ ] Parser and discovery have tests using fixture feeds
+- [x] Adding a site URL discovers its feed; direct RSS, Atom and JSON Feed URLs parse into items
+- [x] Duplicate items are not stored twice
+- [x] Private/loopback addresses are rejected and fetches have timeout and size limits
+- [x] Folders can be created, renamed, deleted; feeds can be assigned
+- [x] Parser and discovery have tests using fixture feeds
