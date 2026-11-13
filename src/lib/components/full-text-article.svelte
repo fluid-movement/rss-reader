@@ -50,7 +50,9 @@
 </script>
 
 {#if item.link || full !== null}
-	<div class="flex items-center gap-2">
+	<div
+		class="flex min-w-0 flex-wrap items-center gap-2 [&_button]:h-auto [&_button]:min-h-11 [&_button]:max-w-full [&_button]:whitespace-normal"
+	>
 		{#if full === null}
 			<Button variant="outline" size="sm" onclick={load} disabled={loading} aria-busy={loading}>
 				{#if loading}<Spinner data-icon="inline-start" />Loading full article…{:else}<FileText
