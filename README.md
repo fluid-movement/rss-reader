@@ -18,6 +18,10 @@ The command loads `.env`, applies migrations to `DATABASE_URL`, hashes the passw
 
 Start the app with `pnpm dev --port 5301 --strictPort` (set `ORIGIN=http://localhost:5301` for this example), then sign in at `/login`. All app routes require a session except `/login`, `/health`, static assets and Better Auth's `/api/auth/*` routes. Public email sign-up is disabled. The login page supports email/password and passkey sign-in; authenticated passkey enrollment/management UI is handled separately. Passkey registration endpoints require an existing session. Sign out using the root page's logout form (`POST /?/logout`).
 
+## Development seed data
+
+`pnpm db:seed` (or `just seed`) fills the local database with a dev user plus fake folders, feeds, items and read/starred state, including a broken feed and a never-fetched feed. The dev login is defined in `scripts/seed-data.ts`. It makes no network requests, resets that user's data on every run (so it is safe to rerun), and refuses to run when `NODE_ENV=production` or when `ORIGIN` is not a localhost/127.0.0.1 URL, because it creates a known-password account. It also refuses a `DATABASE_URL` outside the project directory. The seeded feeds use `example.com` URLs; when the dev server runs, the scheduler may try to refresh them over the network and record fetch errors.
+
 ## Install as app (PWA)
 
 On your deployed **HTTPS** site, use Chrome's **Install app** menu (Android/desktop),
