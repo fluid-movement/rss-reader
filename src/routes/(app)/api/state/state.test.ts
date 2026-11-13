@@ -83,6 +83,11 @@ describe('state endpoint', () => {
 		expect(await call({ action: 'markRead', view: 'nope' })).toBe(400);
 		expect(await call({ action: 'markRead', view: 'feed' })).toBe(400);
 		expect(await call({ action: 'markRead', view: 'all', olderThanDays: -1 })).toBe(400);
+		expect(await call({ action: 'markRead', view: 'all', olderThanDays: 0 })).toBe(400);
+		expect(await call({ action: 'markRead', view: 'all', olderThanDays: 3651 })).toBe(400);
+		expect(await call({ action: 'markRead', view: 'all', olderThanDays: 1.5 })).toBe(400);
+		expect(await call({ action: 'markRead', view: 'all', olderThanDays: '7' })).toBe(400);
+		expect(await call({ action: 'markRead', view: 'all', olderThanDays: 3650 })).toBe(200);
 		expect(await call({ action: 'other' })).toBe(400);
 	});
 	it('marks a view read but not another user’s feed', async () => {
@@ -90,5 +95,13 @@ describe('state endpoint', () => {
 		expect(await call({ action: 'markRead', view: 'all', olderThanDays: 7 })).toBe(200);
 		expect(await call({ action: 'markRead', view: 'feed', id: 'fa' })).toBe(200);
 		expect(db.select().from(itemState).all()).toHaveLength(1);
+	});
+	it('rejects oversized bodies before parsing, declared or streamed', async () => {
+		const big = JSON.stringify({ action: 'item', itemId: 'ia', read: true, pad: 'x'.repeat(5000) });
+		expect(await call(big)).toBe(413);
+		expect(await call(big, 'a', { 'content-length': String(big.length) })).toBe(413);
+		// A lying content-length does not bypass the streamed cap.
+		expect(await call(big, 'a', { 'content-length': '10' })).toBe(413);
+		expect(await call({ action: 'item', itemId: 'ia', read: true })).toBe(200);
 	});
 });

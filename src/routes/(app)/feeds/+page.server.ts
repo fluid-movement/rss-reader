@@ -16,7 +16,11 @@ const field = (data: FormData, name: string) => {
 	return typeof value === 'string' ? value.trim() : '';
 };
 
-export const load: PageServerLoad = (event) => service.list(userId(event));
+export const load: PageServerLoad = (event) => {
+	// Refreshed by the focus/poll sync, which no longer reloads every load function.
+	event.depends('app:feeds');
+	return service.list(userId(event));
+};
 
 function mutation<T>(
 	run: (id: string, data: FormData) => T | Promise<T>,

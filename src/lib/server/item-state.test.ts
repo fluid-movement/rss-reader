@@ -3,7 +3,7 @@ import { connectDatabase } from './db/connect';
 import { migrateDatabase } from './db/migrate';
 import { feeds, folders, items, itemState, user } from './db/schema';
 import { markViewRead, setItemState } from './item-state';
-import { getReaderData, getShellData } from './reader';
+import { getReaderData, getSelectedItem, getShellData } from './reader';
 
 let connection: ReturnType<typeof connectDatabase>;
 const NOW = new Date('2026-11-13T12:00:00Z');
@@ -109,23 +109,23 @@ describe('markViewRead', () => {
 	});
 });
 
-describe('views keep the open article listed', () => {
-	it('keeps a just-read item in Unread while it is open, then drops it on navigation', () => {
+describe('views and the open article', () => {
+	it('drops a just-read item from the Unread list but still serves it as the open article', () => {
 		setItemState(connection.db, 'a', 'i1', { read: true });
-		const open = getReaderData(connection.db, 'a', { view: 'unread', itemId: 'i1' });
-		expect(open.articles.map((article) => article.id)).toContain('i1');
-		expect(open.articles.find((article) => article.id === 'i1')?.read).toBe(true);
 		const list = getReaderData(connection.db, 'a', { view: 'unread' });
 		expect(list.articles.map((article) => article.id)).not.toContain('i1');
+		const open = getSelectedItem(connection.db, 'a', { view: 'unread', itemId: 'i1' });
+		expect(open.read).toBe(true);
 	});
-	it('keeps an unstarred item in Starred while open and exposes starred flags', () => {
+	it('serves an unstarred item as the open article in Starred', () => {
 		setItemState(connection.db, 'a', 'i2', { starred: true });
 		setItemState(connection.db, 'a', 'i2', { starred: false });
-		const open = getReaderData(connection.db, 'a', { view: 'starred', itemId: 'i2' });
-		expect(open.articles.map((article) => article.id)).toEqual(['i2']);
-		expect(open.selectedItem?.starred).toBe(false);
+		expect(getReaderData(connection.db, 'a', { view: 'starred' }).articles).toEqual([]);
+		expect(getSelectedItem(connection.db, 'a', { view: 'starred', itemId: 'i2' }).starred).toBe(
+			false
+		);
 	});
 	it('still rejects an article outside the view', () => {
-		expect(() => getReaderData(connection.db, 'a', { view: 'unread', itemId: 'ib' })).toThrow();
+		expect(() => getSelectedItem(connection.db, 'a', { view: 'unread', itemId: 'ib' })).toThrow();
 	});
 });

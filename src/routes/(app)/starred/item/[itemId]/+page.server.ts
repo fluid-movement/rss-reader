@@ -1,1 +1,3 @@
-export { loadReaderPage as load } from '#lib/server/reader-load.ts';
+import { itemLoader } from '#lib/server/reader-load.ts';
+
+export const load = itemLoader('starred');

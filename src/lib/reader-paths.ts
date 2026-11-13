@@ -16,7 +16,7 @@ export function listHref({ view, viewId }: ViewRef): string {
 		case 'folder':
 			return resolve('/(app)/folder/[id]', { id });
 		default:
-			return resolve('/(app)');
+			return resolve('/(app)/(all)');
 	}
 }
 
@@ -33,6 +33,6 @@ export function itemHref({ view, viewId }: ViewRef, itemId: string): string {
 		case 'folder':
 			return resolve('/(app)/folder/[id]/item/[itemId]', { id, itemId });
 		default:
-			return resolve('/(app)/item/[itemId]', { itemId });
+			return resolve('/(app)/(all)/item/[itemId]', { itemId });
 	}
 }

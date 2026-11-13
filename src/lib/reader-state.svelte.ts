@@ -1,4 +1,4 @@
-import { invalidateAll } from '$app/navigation';
+import { invalidate } from '$app/navigation';
 import { toast } from 'svelte-sonner';
 import type { ArticlePreview, ReaderView } from '#lib/reader.ts';
 
@@ -35,6 +35,14 @@ export function unreadDelta(feedId: string) {
 		delta += entry.read ? -1 : 1;
 	}
 	return delta;
+}
+
+/**
+ * Reload only what read/star state affects: the list page, the open article and the sidebar
+ * counts. Keys without a dependent load (for example on /feeds) are no-ops.
+ */
+export async function syncReaderData() {
+	await Promise.all([invalidate('app:list'), invalidate('app:item'), invalidate('app:feeds')]);
 }
 
 async function post(body: unknown) {
@@ -84,7 +92,7 @@ export async function updateArticle(
 		toast.error(failure);
 		return false;
 	}
-	await invalidateAll();
+	await syncReaderData();
 	settle([article.id], [mine]);
 	return true;
 }
@@ -116,7 +124,7 @@ export async function markViewRead(
 		toast.error('Could not mark articles as read. Nothing was changed.');
 		return false;
 	}
-	await invalidateAll();
+	await syncReaderData();
 	settle(
 		applied.map(({ article }) => article.id),
 		applied.map(({ mine }) => mine)

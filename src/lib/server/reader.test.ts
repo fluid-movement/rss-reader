@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { connectDatabase } from './db/connect';
 import { migrateDatabase } from './db/migrate';
 import { feeds, folders, items, itemState, user } from './db/schema';
-import { getReaderData, getShellData } from './reader';
+import { getArticlePage, getReaderData, getSelectedItem, getShellData } from './reader';
 import { sanitizeArticle, webUrl } from './reader-content';
 
 let connection: ReturnType<typeof connectDatabase>;
@@ -77,9 +77,12 @@ describe('user-scoped reader queries', () => {
 		expect(shell.folders.map((folder) => folder.id)).toEqual(['folder']);
 	});
 	it('lists newest articles and loads sanitized full content with metadata', () => {
-		const data = getReaderData(connection.db, 'owner', { view: 'all', itemId: 'article' });
+		const data = getReaderData(connection.db, 'owner', { view: 'all' });
 		expect(data.articles.map((article) => article.id)).toEqual(['article', 'older']);
-		expect(data.selectedItem).toMatchObject({
+		expect(data.hasMore).toBe(false);
+		expect(
+			getSelectedItem(connection.db, 'owner', { view: 'all', itemId: 'article' })
+		).toMatchObject({
 			title: 'A story',
 			feedTitle: 'Journal',
 			author: 'A. Writer',
@@ -90,12 +93,15 @@ describe('user-scoped reader queries', () => {
 	});
 	it('keeps nested feed and folder lists scoped and provides shareable back paths', () => {
 		for (const view of ['feed', 'folder'] as const) {
-			const data = getReaderData(connection.db, 'owner', { view, id: view, itemId: 'article' });
+			const data = getReaderData(connection.db, 'owner', { view, id: view });
 			expect(data.articles.map((article) => article.id)).toEqual(['article']);
 			expect(data.listPath).toBe(`/${view}/${view}`);
+			expect(
+				getSelectedItem(connection.db, 'owner', { view, id: view, itemId: 'article' }).id
+			).toBe('article');
 		}
 		expect(() =>
-			getReaderData(connection.db, 'owner', { view: 'feed', id: 'second', itemId: 'article' })
+			getSelectedItem(connection.db, 'owner', { view: 'feed', id: 'second', itemId: 'article' })
 		).toThrow();
 	});
 	it('rejects another user’s feed, folder and article IDs without revealing them', () => {
@@ -106,7 +112,7 @@ describe('user-scoped reader queries', () => {
 			getReaderData(connection.db, 'owner', { view: 'folder', id: 'private-folder' })
 		).toThrow();
 		expect(() =>
-			getReaderData(connection.db, 'owner', { view: 'all', itemId: 'secret' })
+			getSelectedItem(connection.db, 'owner', { view: 'all', itemId: 'secret' })
 		).toThrow();
 	});
 	it('reads existing state without mutating it', () => {
@@ -126,7 +132,7 @@ describe('user-scoped reader queries', () => {
 		const data = getReaderData(connection.db, 'new-user', { view: 'all' });
 		expect(data).toMatchObject({
 			articles: [],
-			selectedItem: null,
+			hasMore: false,
 			hasFeeds: false,
 			listPath: '/',
 			viewTitle: 'All articles'
@@ -164,5 +170,59 @@ describe('article trust boundary', () => {
 		])
 			expect(webUrl(value)).toBeNull();
 		expect(webUrl('https://example.com/article')).toBe('https://example.com/article');
+	});
+});
+
+describe('paginated lists and starred total', () => {
+	function seedMany(count: number) {
+		connection.db
+			.insert(items)
+			.values(
+				Array.from({ length: count }, (_, index) => ({
+					id: `bulk-${String(index).padStart(3, '0')}`,
+					feedId: 'second',
+					guid: `bulk-${index}`,
+					title: `Bulk ${index}`,
+					// Pairs share a timestamp to exercise the id tie-break across page borders.
+					publishedAt: new Date(Date.UTC(2020, 0, 1) + Math.floor(index / 2) * 60_000)
+				}))
+			)
+			.run();
+	}
+	it('continues after a cursor without gaps or repeats', () => {
+		seedMany(25);
+		const selection = { view: 'feed', id: 'second' } as const;
+		const seen: string[] = [];
+		let page = getArticlePage(connection.db, 'owner', selection, { limit: 10 });
+		expect(page.articles).toHaveLength(10);
+		expect(page.hasMore).toBe(true);
+		for (;;) {
+			seen.push(...page.articles.map((article) => article.id));
+			if (!page.hasMore) break;
+			const last = page.articles.at(-1)!;
+			page = getArticlePage(connection.db, 'owner', selection, {
+				limit: 10,
+				after: { sortAt: last.sortAt.getTime(), id: last.id }
+			});
+		}
+		const all = getArticlePage(connection.db, 'owner', selection, { limit: 500 });
+		expect(seen).toEqual(all.articles.map((article) => article.id));
+		expect(new Set(seen).size).toBe(seen.length);
+		expect(seen.length).toBe(26); // 25 seeded plus the fixture item in this feed
+	});
+	it('bounds the default first page', () => {
+		seedMany(130);
+		const data = getReaderData(connection.db, 'owner', { view: 'all' });
+		expect(data.articles).toHaveLength(100);
+		expect(data.hasMore).toBe(true);
+	});
+	it('counts starred items per user, without the list limit', () => {
+		expect(getShellData(connection.db, 'owner').starred).toBe(0);
+		connection.db
+			.insert(itemState)
+			.values({ userId: 'owner', itemId: 'article', starredAt: new Date() })
+			.run();
+		expect(getShellData(connection.db, 'owner').starred).toBe(1);
+		expect(getShellData(connection.db, 'other').starred).toBe(0);
 	});
 });

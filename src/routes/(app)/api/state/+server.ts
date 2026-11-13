@@ -5,6 +5,30 @@ import type { ReaderView } from '#lib/reader.ts';
 import type { RequestHandler } from './$types';
 
 const VIEWS: ReaderView[] = ['all', 'unread', 'starred', 'feed', 'folder'];
+/** Real bodies are a few hundred bytes; anything bigger is rejected before parsing. */
+const MAX_BODY_BYTES = 4096;
+const MAX_OLDER_THAN_DAYS = 3650;
+
+/** Reads the body as text, stopping as soon as it exceeds the cap (also without a content-length). */
+async function readCappedBody(request: Request): Promise<string> {
+	const declared = Number(request.headers.get('content-length'));
+	if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) error(413, 'Request too large.');
+	const reader = request.body?.getReader();
+	if (!reader) return '';
+	const chunks: Uint8Array[] = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		total += value.byteLength;
+		if (total > MAX_BODY_BYTES) {
+			void reader.cancel();
+			error(413, 'Request too large.');
+		}
+		chunks.push(value);
+	}
+	return new TextDecoder().decode(Buffer.concat(chunks));
+}
 
 /**
  * JSON mutations for read/star state. Always scoped to locals.user; a same-origin
@@ -16,9 +40,10 @@ export const POST: RequestHandler = async ({ locals, request, url }) => {
 	if (origin && origin !== url.origin) error(403, 'Cross-origin request rejected.');
 	if (!request.headers.get('content-type')?.startsWith('application/json'))
 		error(415, 'Expected JSON.');
+	const text = await readCappedBody(request);
 	let body: Record<string, unknown>;
 	try {
-		const parsed: unknown = await request.json();
+		const parsed: unknown = JSON.parse(text);
 		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
 		body = parsed as Record<string, unknown>;
 	} catch {
@@ -43,9 +68,9 @@ export const POST: RequestHandler = async ({ locals, request, url }) => {
 		if (
 			olderThanDays !== undefined &&
 			(typeof olderThanDays !== 'number' ||
-				!Number.isFinite(olderThanDays) ||
-				olderThanDays < 0 ||
-				olderThanDays > 3650)
+				!Number.isInteger(olderThanDays) ||
+				olderThanDays < 1 ||
+				olderThanDays > MAX_OLDER_THAN_DAYS)
 		)
 			error(400, 'Invalid age.');
 		const updated = markViewRead(db, locals.user.id, {

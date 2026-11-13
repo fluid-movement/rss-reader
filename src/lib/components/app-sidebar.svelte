@@ -23,6 +23,8 @@
 		Monitor
 	} from '@lucide/svelte';
 	let { data }: { data: ShellData } = $props();
+	// Folder, feed and view badges share one muted style.
+	const badgeClass = 'font-normal text-muted-foreground';
 	let refreshing = $state(false);
 	let refreshMessage = $state('');
 	let refreshFailed = $state(false);
@@ -60,7 +62,13 @@
 		);
 	const totalUnread = $derived(data.feeds.reduce((sum, feed) => sum + feedUnread(feed.id), 0));
 	const views = $derived([
-		{ title: 'All articles', href: '/', path: resolve('/(app)'), icon: Inbox, count: totalUnread },
+		{
+			title: 'All articles',
+			href: '/',
+			path: resolve('/(app)/(all)'),
+			icon: Inbox,
+			count: totalUnread
+		},
 		{
 			title: 'Unread',
 			href: '/unread',
@@ -68,7 +76,13 @@
 			icon: Mail,
 			count: totalUnread
 		},
-		{ title: 'Starred', href: '/starred', path: resolve('/(app)/starred'), icon: Star, count: 0 }
+		{
+			title: 'Starred',
+			href: '/starred',
+			path: resolve('/(app)/starred'),
+			icon: Star,
+			count: data.starred
+		}
 	]);
 	function active(href: string) {
 		return href === '/'
@@ -78,9 +92,9 @@
 </script>
 
 <Sidebar.Root collapsible="none" class="w-full">
-	<Sidebar.Header class="p-5">
+	<Sidebar.Header class="p-4">
 		<a
-			href={resolve('/(app)')}
+			href={resolve('/(app)/(all)')}
 			class="flex items-center gap-2 text-base font-semibold tracking-tight"
 			><Rss class="size-5" /> RSS Reader</a
 		>
@@ -115,7 +129,7 @@
 										aria-current={active(view.href) ? 'page' : undefined}
 										><view.icon /><span>{view.title}</span></a
 									>{/snippet}
-							</Sidebar.MenuButton>{#if view.count > 0 && view.href !== '/starred'}<Sidebar.MenuBadge
+							</Sidebar.MenuButton>{#if view.count > 0}<Sidebar.MenuBadge class={badgeClass}
 									>{view.count}</Sidebar.MenuBadge
 								>{/if}</Sidebar.MenuItem
 						>
@@ -136,7 +150,7 @@
 											aria-current={active(href) ? 'page' : undefined}
 											><Folder /><span>{folder.name}</span></a
 										>{/snippet}</Sidebar.MenuButton
-								>{#if folderUnread(folder.id) > 0}<Sidebar.MenuBadge
+								>{#if folderUnread(folder.id) > 0}<Sidebar.MenuBadge class={badgeClass}
 										>{folderUnread(folder.id)}</Sidebar.MenuBadge
 									>{/if}
 								<Sidebar.MenuSub>
@@ -166,7 +180,7 @@
 											aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
 											><Rss /><span>{feed.title}</span></a
 										>{/snippet}</Sidebar.MenuButton
-								>{#if feedUnread(feed.id) > 0}<Sidebar.MenuBadge
+								>{#if feedUnread(feed.id) > 0}<Sidebar.MenuBadge class={badgeClass}
 										>{feedUnread(feed.id)}</Sidebar.MenuBadge
 									>{/if}</Sidebar.MenuItem
 							>
@@ -186,7 +200,7 @@
 			</Sidebar.Group>
 		</nav>
 	</Sidebar.Content>
-	<Sidebar.Footer class="gap-3 p-3">
+	<Sidebar.Footer class="gap-2 p-2">
 		<Sidebar.Menu>
 			<Sidebar.MenuItem
 				><Sidebar.MenuButton
@@ -232,7 +246,7 @@
 					></DropdownMenu.Content
 				>
 			</DropdownMenu.Root>
-			<form method="POST" action={`${resolve('/(app)')}?/logout`}>
+			<form method="POST" action={`${resolve('/(app)/(all)')}?/logout`}>
 				<Button type="submit" variant="ghost" size="icon" aria-label="Log out"><LogOut /></Button>
 			</form>
 		</div>

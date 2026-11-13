@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { onMount } from 'svelte';
-	import { afterNavigate, invalidateAll } from '$app/navigation';
+	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { ModeWatcher } from 'mode-watcher';
 	import { Menu } from '@lucide/svelte';
@@ -10,6 +10,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Toaster } from '#lib/components/ui/sonner/index.js';
 	import AppSidebar from '#lib/components/app-sidebar.svelte';
+	import { syncReaderData } from '#lib/reader-state.svelte.ts';
 	import type { ShellData } from '#lib/reader.ts';
 	let { data, children }: { data: ShellData; children: Snippet } = $props();
 	let navigationOpen = $state(false);
@@ -26,12 +27,12 @@
 		const sync = () => {
 			if (document.visibilityState !== 'visible' || Date.now() - last < MIN_GAP_MS) return;
 			last = Date.now();
-			void invalidateAll();
+			void syncReaderData();
 		};
 		const poll = setInterval(() => {
 			if (document.visibilityState === 'visible') {
 				last = Date.now();
-				void invalidateAll();
+				void syncReaderData();
 			}
 		}, POLL_MS);
 		window.addEventListener('focus', sync);
@@ -49,7 +50,7 @@
 <Sidebar.Provider class="h-dvh min-h-0 overflow-hidden">
 	<!-- Layout switches with CSS (not a media-query store) so SSR and first paint match the viewport. -->
 	<div class="flex size-full min-w-0 flex-col lg:flex-row">
-		<aside class="hidden h-full w-72 shrink-0 border-r lg:block">
+		<aside class="hidden h-full w-60 shrink-0 border-r min-[1150px]:w-72 lg:block">
 			<AppSidebar {data} />
 		</aside>
 		<header class="flex h-14 shrink-0 items-center gap-3 border-b px-3 lg:hidden">
@@ -71,7 +72,7 @@
 					<AppSidebar {data} />
 				</Sheet.Content>
 			</Sheet.Root>
-			<a href={resolve('/(app)')} class="font-semibold tracking-tight">RSS Reader</a>
+			<a href={resolve('/(app)/(all)')} class="font-semibold tracking-tight">RSS Reader</a>
 		</header>
 		<main id="main-content" class="min-h-0 min-w-0 flex-1">{@render children()}</main>
 	</div>

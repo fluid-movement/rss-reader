@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ReaderWorkspace from '#lib/components/reader-workspace.svelte';
-	import type { ReaderData } from '#lib/reader.ts';
-	let { data }: { data: ReaderData } = $props();
+	import ReaderArticle from '#lib/components/reader-article.svelte';
+	import type { ReaderItemData } from '#lib/reader.ts';
+	let { data }: { data: ReaderItemData } = $props();
 </script>
 
-<ReaderWorkspace {data} />
+<ReaderArticle {data} />
