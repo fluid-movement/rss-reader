@@ -1,4 +1,4 @@
-- [ ] Tapping an article image opens an accessible viewer with pinch/double-tap zoom and swipe-down or button close, verified with touch emulation
-- [ ] Wide tables, code blocks and images never cause horizontal page scroll at 320-430 px and scroll inside their own container without triggering article swipes
-- [ ] Reader typography is comfortable at 390 px for default, smallest and largest font settings, light and dark, checked on screenshots of at least five real articles from the seed
-- [ ] A collapsing header hides on scroll down and returns on scroll up without layout jumps; links and the share action behave sensibly in browser and installed-PWA modes; pnpm check and pnpm test pass
+- [x] Tapping an article image opens an accessible viewer with pinch/double-tap zoom and swipe-down or button close, verified with touch emulation
+- [x] Wide tables, code blocks and images never cause horizontal page scroll at 320-430 px and scroll inside their own container without triggering article swipes
+- [x] Reader typography is comfortable at 390 px for default, smallest and largest font settings, light and dark, checked on screenshots of at least five real articles from the seed
+- [x] A collapsing header hides on scroll down and returns on scroll up without layout jumps; links and the share action behave sensibly in browser and installed-PWA modes; pnpm check and pnpm test pass
