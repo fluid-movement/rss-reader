@@ -72,6 +72,10 @@ export function createReaderTransition() {
 					clearTimeout(timeout);
 					release();
 					await complete;
+					// Named snapshot participants are excluded from live hit-testing, even when
+					// the overlay has pointer-events:none. Capture only the outgoing workspace:
+					// the incoming reader stays live and accepts swipes during the exit animation.
+					if (current === generation) workspace.style.viewTransitionName = 'none';
 				});
 				void transition.ready.catch(cancel);
 				void transition.updateCallbackDone.catch(cancel);

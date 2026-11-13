@@ -105,7 +105,6 @@ For each of the four:
 - [ ] Keyboard: focusing the search box raises the keyboard without covering the field, the layout does not jump or zoom, and dismissing it restores the layout.
 - [ ] Share sheet: Share on an article opens the native sheet (and copies the link where Web Share is missing).
 - [ ] Text: increasing the system text size keeps every control reachable with no horizontal scrolling.
-||||||| parent of 0fd73ac (Mobile transitions and perceived performance (01M7AQ6B39ZF3ACP724Z8ACD8D))
 
 ## Mobile performance budget
 

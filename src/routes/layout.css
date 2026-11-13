@@ -133,9 +133,18 @@
 	}
 }
 
-/* Only the reader workspace is captured; the shell/sidebar never crossfade. */
+/* Only the outgoing reader workspace is captured; the incoming reader stays interactive. */
 html[data-reader-transition] {
 	view-transition-name: none;
+	/* The live article must receive gestures as soon as it mounts, not after the snapshot fades. */
+	pointer-events: auto;
+}
+html[data-reader-transition]::view-transition,
+html[data-reader-transition]::view-transition-group(reader-workspace),
+html[data-reader-transition]::view-transition-image-pair(reader-workspace),
+html[data-reader-transition]::view-transition-old(reader-workspace) {
+	/* Snapshots are decorative: hit-test the live reader beneath the transition overlay. */
+	pointer-events: none;
 }
 html[data-reader-transition]::view-transition-group(reader-workspace) {
 	animation: none;
@@ -151,25 +160,13 @@ html[data-reader-transition]::view-transition-new(reader-workspace) {
 html[data-reader-transition='open']::view-transition-old(reader-workspace) {
 	animation-name: reader-list-out;
 }
-html[data-reader-transition='open']::view-transition-new(reader-workspace) {
-	animation-name: reader-article-in;
-}
 html[data-reader-transition='back']::view-transition-old(reader-workspace) {
 	animation-name: reader-article-out;
-}
-html[data-reader-transition='back']::view-transition-new(reader-workspace) {
-	animation-name: reader-list-in;
 }
 @keyframes reader-list-out {
 	to {
 		opacity: 0;
 		transform: translateX(-12px);
-	}
-}
-@keyframes reader-article-in {
-	from {
-		opacity: 0;
-		transform: translateX(20px);
 	}
 }
 @keyframes reader-article-out {
@@ -178,15 +175,8 @@ html[data-reader-transition='back']::view-transition-new(reader-workspace) {
 		transform: translateX(20px);
 	}
 }
-@keyframes reader-list-in {
-	from {
-		opacity: 0;
-		transform: translateX(-12px);
-	}
-}
 @media (prefers-reduced-motion: reduce) {
-	html[data-reader-transition]::view-transition-old(reader-workspace),
-	html[data-reader-transition]::view-transition-new(reader-workspace) {
+	html[data-reader-transition]::view-transition-old(reader-workspace) {
 		animation: none;
 	}
 }

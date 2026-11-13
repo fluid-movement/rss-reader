@@ -236,7 +236,7 @@
 	<!-- Touch gestures are an extra; every action is also in the row menu. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="touch-[pan-y_pinch-zoom] relative bg-background {dragging
+		class="relative touch-pan-y bg-background {dragging
 			? ''
 			: 'transition-transform duration-150 ease-out motion-reduce:transition-none'}"
 		style:transform={offset ? `translate3d(${offset}px,0,0)` : undefined}

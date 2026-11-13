@@ -112,6 +112,8 @@ describe('view transition navigation handshake', () => {
 		expect(s.root.dataset.readerTransition).toBe('open');
 		s.complete.resolve();
 		await updating;
+		// Keep the incoming article out of snapshot capture so it remains hit-testable.
+		expect(s.workspace.style.viewTransitionName).toBe('none');
 		s.finished.resolve();
 		await Promise.resolve();
 		expect(s.workspace.style.viewTransitionName).toBe('previous');
@@ -170,6 +172,22 @@ describe('view transition navigation handshake', () => {
 		s.prepare.mockRejectedValue(new Error('unmounted'));
 		await s.run();
 		expect(s.startViewTransition).not.toHaveBeenCalled();
+	});
+
+	it('does not let an older update callback remove a newer snapshot name', async () => {
+		const s = setup();
+		const first = s.run();
+		await Promise.resolve();
+		const updating = s.update();
+		await first;
+		const second = s.run('back');
+		await Promise.resolve();
+		expect(s.workspace.style.viewTransitionName).toBe('reader-workspace');
+		s.complete.resolve();
+		await updating;
+		expect(s.workspace.style.viewTransitionName).toBe('reader-workspace');
+		await vi.advanceTimersByTimeAsync(100);
+		await second;
 	});
 
 	it('cancels an older transition without letting its late finish clear the new one', async () => {
