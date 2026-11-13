@@ -18,6 +18,33 @@ The command loads `.env`, applies migrations to `DATABASE_URL`, hashes the passw
 
 Start the app with `pnpm dev --port 5301 --strictPort` (set `ORIGIN=http://localhost:5301` for this example), then sign in at `/login`. All app routes require a session except `/login`, `/health`, static assets and Better Auth's `/api/auth/*` routes. Public email sign-up is disabled. The login page supports email/password and passkey sign-in; authenticated passkey enrollment/management UI is handled separately. Passkey registration endpoints require an existing session. Sign out using the root page's logout form (`POST /?/logout`).
 
+## Install as app (PWA)
+
+On your deployed **HTTPS** site, use Chrome's **Install app** menu (Android/desktop),
+or Safari's **Share → Add to Home Screen → Open as Web App** (iPhone/iPad).
+Sign in normally; there is no public sign-up. HTTPS is required except on localhost.
+
+Version 1 is **online-only**: the service worker precaches public JS, CSS, fonts and
+icons, not pages, articles, API responses, auth requests or form submissions. Opening
+a page offline shows “You are offline”; feed/data requests still require a connection.
+The manifest uses the light background token (`#ffffff`); page theme-color metadata
+also supplies the dark token (`#0a0a0a`) according to the system color preference.
+
+SvelteKit registers `src/service-worker.ts` automatically in **production builds only**.
+After deployment, a full-page visit checks for an update. Close all app tabs/windows
+and reopen to activate a waiting version; existing tabs retain their matching assets.
+Activation deletes only old `rss-reader-assets-*` caches. No forced reload interrupts reading.
+
+To test locally: `pnpm build`, then `pnpm preview --port 5310 --strictPort`.
+In browser DevTools → Application, inspect the manifest, service worker and Cache Storage;
+only build/static URLs should be cached. Test offline with a full-page navigation (not
+just an in-app data load). Auth/API/action requests must never come from Cache Storage.
+The manifest, icons and worker are public static assets served before the auth hook.
+
+Icons are generated from `static/icons/rss.svg` with ImageMagick, for example:
+`magick -background none static/icons/rss.svg -resize 192x192 static/icons/icon-192.png`.
+The 512px maskable icon has an opaque background and a centered glyph inside the safe zone.
+
 ## Database migrations
 
 The complete v1 reader schema is in `src/lib/server/db/schema.ts`; Better Auth's generated schema is in `src/lib/server/db/auth.schema.ts`. Reader timestamps use integer Unix milliseconds mapped to `Date`. Items belong to a user via their private feed. Queries must scope folders/feeds/settings/item state by user, and items through their feed; never accept a different user's folder/item ID from a client without an ownership check. User deletion cascades through all owned data; removing a folder only unfiles its feeds.

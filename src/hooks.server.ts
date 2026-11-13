@@ -20,7 +20,8 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 
 	const publicRoute = event.route.id === '/login' || event.route.id === '/health';
 	const authRoute = event.url.pathname.startsWith('/api/auth/');
-	// Real static assets are served outside this hook by SvelteKit.
+	// Real static assets (including the PWA manifest, worker and icons) are
+	// served outside this hook by SvelteKit; no broad public-path bypass needed.
 	if (!event.locals.user && !publicRoute && !authRoute) redirect(303, '/login');
 	return svelteKitHandler({ event, resolve, auth, building });
 };
