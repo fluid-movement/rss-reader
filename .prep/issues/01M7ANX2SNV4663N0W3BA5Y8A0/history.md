@@ -1,0 +1,1 @@
+- 2026-11-13T20:01:45Z claude-code: Implemented, ready for check: six parsing/polish fixes implemented by opencode in worktree rss-reader-wt-parsing-polish (branch wt/parsing-polish); pnpm check/test pass; browser verification pending

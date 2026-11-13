@@ -1,4 +1,4 @@
-- [ ] pnpm test:mobile runs touch-emulated Playwright tests for the existing mobile flows offline against a seeded private database and passes reliably (run three times)
-- [ ] Tests cover drawer, list to article and back with scroll preserved, article swipe left/right with edge-start and horizontal-scroll exclusions, row swipes with undo, pull to refresh, and no horizontal overflow at 360/390/430 px
-- [ ] The README documents setup (browser install), how to run the tests, and a real-device checklist for iOS Safari, installed iOS PWA, Android Chrome and installed Android PWA
-- [ ] Playwright and browsers are not committed, the dev seed guard is respected, and pnpm check and pnpm test are unaffected
+- [x] pnpm test:mobile runs touch-emulated Playwright tests for the existing mobile flows offline against a seeded private database and passes reliably (run three times)
+- [x] Tests cover drawer, list to article and back with scroll preserved, article swipe left/right with edge-start and horizontal-scroll exclusions, row swipes with undo, pull to refresh, and no horizontal overflow at 360/390/430 px
+- [x] The README documents setup (browser install), how to run the tests, and a real-device checklist for iOS Safari, installed iOS PWA, Android Chrome and installed Android PWA
+- [x] Playwright and browsers are not committed, the dev seed guard is respected, and pnpm check and pnpm test are unaffected
