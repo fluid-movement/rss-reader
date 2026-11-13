@@ -1,0 +1,1 @@
+Always use shadcn svelte components when possible, do not created base components yourself. Use the shadcn-svelte skill.
