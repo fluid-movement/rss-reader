@@ -1,0 +1,5 @@
+- [ ] The thead/tbody repetition bomb no longer ties up a worker for the full timeout (rejected or parsed quickly) and a regression test proves it
+- [ ] An aborted queued waiter is removed from the dom-worker queue and does not swallow a wake; tested
+- [ ] Worker output is capped or sliced before main-thread sanitization; a test with a 1 MB entity-heavy page shows no multi-hundred-millisecond main-thread spike
+- [ ] BBC and Wired real-page fixtures extract with correct byline spacing and no empty figures or caption boilerplate; sanitizer behavior unchanged and tests pass
+- [ ] pnpm check and pnpm test pass; the worker still works under pnpm build and node build from another cwd
