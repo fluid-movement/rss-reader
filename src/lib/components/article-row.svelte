@@ -213,26 +213,30 @@
 	<div aria-hidden="true" class="pointer-events-none absolute inset-0 flex items-center">
 		{#if offset > 0}
 			<div
-				class="flex h-full w-full items-center justify-start gap-2 pl-5 text-sm font-medium text-white {committed
+				class="flex h-full w-full items-center justify-start text-sm font-medium text-white {committed
 					? 'bg-blue-600'
 					: 'bg-blue-500/70'}"
 			>
-				{#if read}<Mail class="size-5" />Mark unread{:else}<MailOpen class="size-5" />Mark read{/if}
+				<span class="flex w-24 shrink-0 flex-col items-center gap-1 text-center">
+					{#if read}<Mail class="size-5" />Unread{:else}<MailOpen class="size-5" />Read{/if}
+				</span>
 			</div>
 		{:else if offset < 0}
 			<div
-				class="flex h-full w-full items-center justify-end gap-2 pr-5 text-sm font-medium text-white {committed
+				class="flex h-full w-full items-center justify-end text-sm font-medium text-white {committed
 					? 'bg-amber-600'
 					: 'bg-amber-500/70'}"
 			>
-				{#if starred}<StarOff class="size-5" />Unstar{:else}<Star class="size-5" />Star{/if}
+				<span class="flex w-24 shrink-0 flex-col items-center gap-1 text-center">
+					{#if starred}<StarOff class="size-5" />Unstar{:else}<Star class="size-5" />Star{/if}
+				</span>
 			</div>
 		{/if}
 	</div>
 	<!-- Touch gestures are an extra; every action is also in the row menu. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="relative touch-pan-y bg-background {dragging
+		class="touch-[pan-y_pinch-zoom] relative bg-background {dragging
 			? ''
 			: 'transition-transform duration-150 ease-out motion-reduce:transition-none'}"
 		style:transform={offset ? `translate3d(${offset}px,0,0)` : undefined}
@@ -249,8 +253,9 @@
 				<a
 					{...props}
 					{href}
+					data-sveltekit-preload-data="tap"
 					draggable="false"
-					class="{props.class} pr-12 [-webkit-touch-callout:none] pointer-coarse:select-none"
+					class="{props.class} pr-12 [-webkit-touch-callout:none] active:opacity-70 pointer-coarse:select-none"
 					aria-current={selected ? 'page' : undefined}
 				>
 					{@render children()}

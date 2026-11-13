@@ -105,6 +105,28 @@ For each of the four:
 - [ ] Keyboard: focusing the search box raises the keyboard without covering the field, the layout does not jump or zoom, and dismissing it restores the layout.
 - [ ] Share sheet: Share on an article opens the native sheet (and copies the link where Web Share is missing).
 - [ ] Text: increasing the system text size keeps every control reachable with no horizontal scrolling.
+||||||| parent of 0fd73ac (Mobile transitions and perceived performance (01M7AQ6B39ZF3ACP724Z8ACD8D))
+
+## Mobile performance budget
+
+Measure a production build on a 390 px touch viewport with **4× CPU slowdown and
+Fast 3G** (1.6 Mbps down, 750 Kbps up, 150 ms latency). Record cold and touch-preloaded
+list → article → Back runs separately; do not count server/network wait as animation time.
+
+- Tap feedback and the loading skeleton: next paint, targeting **≤100 ms**.
+- List ↔ article view transition: **≤180 ms**, transform/opacity only; article swipes
+  retain their own 160 ms transform animation. Reduced motion disables animation.
+- Navigation chrome/list layout shift: **0**; total page CLS target **≤0.1** (feed
+  images without intrinsic dimensions can still shift article content).
+- Interaction responsiveness: **INP ≤200 ms**; target 60 fps during swipe/pull,
+  with no animation-induced layout or long tasks (>50 ms).
+- Back preserves the list offset and loaded pages; new articles start at the top,
+  while browser history restores an article's scroll position. Article navigation
+  must not reload the persisted list or expand invalidation scope.
+
+Verify in Chrome's Performance/Network panels, also with View Transitions unavailable,
+reduced motion enabled, and slow/failed article requests. These are review targets,
+not measured guarantees or a CI browser benchmark.
 
 ## Coolify deployment
 

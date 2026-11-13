@@ -138,7 +138,6 @@ export function preloadNeighbors() {
 	const index = current.articleIds.indexOf(current.selectedId);
 	if (index < 0) return;
 	for (const id of [current.articleIds[index - 1], current.articleIds[index + 1]]) {
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- hrefFor() wraps resolve().
 		if (id) void preloadData(current.hrefFor(id)).catch(() => {});
 	}
 }
@@ -158,9 +157,9 @@ export async function moveArticle(direction: 1 | -1): Promise<boolean> {
 	}
 	if (index === null) return false;
 	// reset: false keeps the list scroll and focus where they are; the workspace scrolls the selected row into view.
-	// replaceState: paging between articles must not add history entries, so Back returns to the list in one step.
+	// replace: paging between articles must not add history entries, so Back returns to the list in one step.
 	// eslint-disable-next-line svelte/no-navigation-without-resolve -- hrefFor() wraps resolve().
-	await goto(current.hrefFor(ids[index]), { reset: false, replaceState: !!current.selectedId });
+	await goto(current.hrefFor(ids[index]), { reset: false, replace: !!current.selectedId });
 	return true;
 }
 

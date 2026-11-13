@@ -3,7 +3,7 @@
 	import ArticleImageViewer from '#lib/components/article-image-viewer.svelte';
 	import { enhanceArticle, nextToolbarState } from '#lib/reader-enhancements.ts';
 	import { untrack } from 'svelte';
-	import { afterNavigate } from '$app/navigation';
+	import { afterNavigate, snapshot } from '$app/navigation';
 	import {
 		ArrowLeft,
 		ChevronLeft,
@@ -46,6 +46,22 @@
 	let barFocused = $state(false);
 	let scrollAnchor = 0;
 	let scrollArticleId = '';
+	let scroller: HTMLElement | null = null;
+	snapshot({
+		id: 'reader-article-scroll',
+		capture: () => ({ id: selected.id, top: scroller?.scrollTop ?? 0 }),
+		restore: (value) => {
+			if (scroller && value.id === selected.id) {
+				scroller.scrollTop = value.top;
+				scrollAnchor = value.top;
+			}
+		},
+		reset: () => {
+			if (scroller) scroller.scrollTop = 0;
+			scrollAnchor = 0;
+			collapsed = false;
+		}
+	});
 	function trackScroll(event: Event) {
 		const el = event.currentTarget as HTMLElement;
 		if (scrollArticleId !== selected.id) {
@@ -169,20 +185,13 @@
 				data-collapsed={collapsed && !headerFocused}
 				inert={collapsed && !headerFocused}
 			>
-				<Button
-					variant="ghost"
-					size="sm"
-					aria-pressed={isStarred(selected)}
-					onclick={toggleStar}
+				<Button variant="ghost" size="sm" aria-pressed={isStarred(selected)} onclick={toggleStar}
 					><Star
 						data-icon="inline-start"
 						class={isStarred(selected) ? 'fill-current text-amber-500' : ''}
 					/>{isStarred(selected) ? 'Starred' : 'Star'}</Button
 				>
-				<Button
-					variant="ghost"
-					size="sm"
-					onclick={toggleRead}
+				<Button variant="ghost" size="sm" onclick={toggleRead}
 					>{#if isRead(selected)}<Mail data-icon="inline-start" />Mark unread{:else}<MailOpen
 							data-icon="inline-start"
 						/>Mark read{/if}</Button
@@ -212,9 +221,13 @@
 					commit: step,
 					warm: preloadNeighbors
 				}))}
-			{@attach () => {
+			{@attach (node) => {
+				scroller = node;
 				collapsed = false;
 				scrollAnchor = 0;
+				return () => {
+					if (scroller === node) scroller = null;
+				};
 			}}
 		>
 			<article
@@ -284,7 +297,8 @@
 			size="icon"
 			class="size-11"
 			aria-label={isRead(selected) ? 'Mark as unread' : 'Mark as read'}
-			onclick={toggleRead}>{#if isRead(selected)}<Mail />{:else}<MailOpen />{/if}</Button
+			onclick={toggleRead}
+			>{#if isRead(selected)}<Mail />{:else}<MailOpen />{/if}</Button
 		>
 		<Button
 			variant="ghost"
@@ -357,7 +371,7 @@
 		opacity: 0;
 	}
 	.reader-scroll {
-		touch-action: pan-y;
+		touch-action: pan-y pinch-zoom;
 		overscroll-behavior-y: contain;
 		overflow-x: hidden;
 		scrollbar-gutter: stable;
@@ -463,7 +477,7 @@
 		min-width: 0;
 		overflow-x: auto;
 		overscroll-behavior-x: contain;
-		touch-action: pan-x pan-y;
+		touch-action: pan-x pan-y pinch-zoom;
 	}
 	.article-prose :global(img[role='button']) {
 		cursor: zoom-in;

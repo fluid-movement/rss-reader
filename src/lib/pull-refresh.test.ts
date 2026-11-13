@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { PULL_COMMIT_DISTANCE, PullTracker, pullOffset } from './pull-refresh';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { attachPullToRefresh, PULL_COMMIT_DISTANCE, PullTracker, pullOffset } from './pull-refresh';
 
 describe('pullOffset', () => {
 	it('resists, is monotonic and capped', () => {
@@ -8,6 +8,72 @@ describe('pullOffset', () => {
 		expect(pullOffset(50)).toBeLessThan(50);
 		expect(pullOffset(120)).toBeGreaterThanOrEqual(PULL_COMMIT_DISTANCE);
 		expect(pullOffset(2000)).toBeLessThanOrEqual(88);
+	});
+});
+
+describe('pull attachment scroll ownership', () => {
+	afterEach(() => vi.unstubAllGlobals());
+	function setup(scrollTop = 0) {
+		vi.stubGlobal('window', { innerWidth: 390 });
+		const element = Object.assign(new EventTarget(), { scrollTop });
+		const onPull = vi.fn();
+		const onRefresh = vi.fn();
+		const detach = attachPullToRefresh(element as unknown as HTMLElement, {
+			onPull,
+			onRefresh,
+			enabled: () => true
+		});
+		function touch(type: string, x: number, y: number, fingers = 1) {
+			const event = new Event(type, { cancelable: true });
+			const point = { identifier: 1, clientX: x, clientY: y };
+			Object.defineProperties(event, {
+				changedTouches: { value: [point] },
+				touches: { value: Array(fingers).fill(point) }
+			});
+			element.dispatchEvent(event);
+			return event;
+		}
+		return { onPull, onRefresh, touch, detach };
+	}
+
+	it('only prevents native scrolling after a downward pull is claimed', () => {
+		const { touch, onPull, onRefresh, detach } = setup();
+		touch('touchstart', 200, 100);
+		expect(touch('touchmove', 200, 105).defaultPrevented).toBe(false);
+		expect(touch('touchmove', 200, 260).defaultPrevented).toBe(true);
+		expect(onPull).toHaveBeenLastCalledWith({ offset: pullOffset(160), armed: true });
+		touch('touchend', 200, 260);
+		expect(onPull).toHaveBeenLastCalledWith(null);
+		expect(onRefresh).toHaveBeenCalledOnce();
+		detach();
+	});
+
+	it.each([
+		[200, 50],
+		[300, 105]
+	])('leaves upward/sideways movement (%i, %i) native', (x, y) => {
+		const { touch, onPull, onRefresh, detach } = setup();
+		touch('touchstart', 200, 100);
+		expect(touch('touchmove', x, y).defaultPrevented).toBe(false);
+		touch('touchend', x, y);
+		expect(onPull).not.toHaveBeenCalled();
+		expect(onRefresh).not.toHaveBeenCalled();
+		detach();
+	});
+
+	it('cancels an armed pull for pinch gestures and detaches listeners cleanly', () => {
+		const { touch, onPull, onRefresh, detach } = setup();
+		touch('touchstart', 200, 100);
+		touch('touchmove', 200, 260);
+		touch('touchstart', 200, 260, 2);
+		expect(onPull).toHaveBeenLastCalledWith(null);
+		touch('touchend', 200, 260);
+		expect(onRefresh).not.toHaveBeenCalled();
+		detach();
+		onPull.mockClear();
+		touch('touchstart', 200, 100);
+		touch('touchmove', 200, 260);
+		expect(onPull).not.toHaveBeenCalled();
 	});
 });
 

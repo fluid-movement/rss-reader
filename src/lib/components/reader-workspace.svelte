@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { untrack } from 'svelte';
-	import { page } from '$app/state';
+	import { tick, untrack } from 'svelte';
+	import { navigating, page } from '$app/state';
+	import { onNavigate } from '$app/navigation';
+	import { createReaderTransition, readerTransitionDirection } from '#lib/reader-navigation.ts';
 	import { resolve } from '$app/paths';
 	import { enhance, type SubmitFunction } from '$app/forms';
 	import {
@@ -33,6 +35,7 @@
 	import { attachPullToRefresh } from '#lib/pull-refresh.ts';
 	import PullRefreshIndicator from '#lib/components/pull-refresh-indicator.svelte';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { EXTRA_PAGE_SIZE, loadChunked, withOpenArticle } from '#lib/reader-list.ts';
 	import ArticleRow from '#lib/components/article-row.svelte';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
@@ -60,6 +63,28 @@
 	} = $props();
 
 	let itemId = $derived(page.params.itemId);
+	let workspace: HTMLElement | null = null;
+	let capturing = $state(false);
+	let loadingArticle = $derived(
+		!capturing &&
+			!itemId &&
+			!navigating.willUnload &&
+			!!navigating.to?.route.id &&
+			readerTransitionDirection(navigating.from, navigating.to) === 'open'
+	);
+	const transition = createReaderTransition();
+	onNavigate((navigation) => {
+		const direction = readerTransitionDirection(navigation.from, navigation.to);
+		if (!direction || !workspace || navigation.shallow) return;
+		void navigation.complete.then(
+			() => (capturing = false),
+			() => (capturing = false)
+		);
+		return transition(workspace, direction, navigation.complete, async () => {
+			capturing = true;
+			await tick();
+		});
+	});
 	let selectedItem = $derived((page.data as { selectedItem?: ReaderItem }).selectedItem);
 	let failure = $derived(
 		data.view === 'feed'
@@ -221,7 +246,8 @@
 	// Keep the open row visible without moving the list otherwise (also for keyboard j/k).
 	let listElement = $state<HTMLElement | null>(null);
 	$effect(() => {
-		if (!itemId) return;
+		// On phones the list is invisible but mounted: scrolling it would destroy the Back position.
+		if (!itemId || !window.matchMedia('(min-width: 1024px)').matches) return;
 		listElement
 			?.querySelector('[aria-current="page"]')
 			?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -241,7 +267,7 @@
 
 	function requestMarkAll(olderThanDays?: number) {
 		const count = unreadAffected(articles, olderThanDays).length;
-		if (count > CONFIRM_ABOVE) confirmMark = { olderThanDays, count };
+		if (count > CONFIRM_ABOVE || hasMore) confirmMark = { olderThanDays, count };
 		else void markAll(olderThanDays);
 	}
 	async function markAll(olderThanDays?: number) {
@@ -273,11 +299,21 @@
 <!-- Both panes render once; CSS picks which is visible so SSR/first paint match the viewport.
 	On phones the list is hidden with visibility (not display) while an article is open, so it
 	keeps its scroll position for the way back. -->
-<div class="relative flex h-full min-w-0">
+<div
+	class="relative flex h-full min-w-0"
+	{@attach (node) => {
+		workspace = node;
+		return () => {
+			workspace = null;
+		};
+	}}
+>
 	<div
+		inert={loadingArticle}
+		aria-hidden={loadingArticle ? true : undefined}
 		class="h-full min-w-0 flex-1 min-[1150px]:w-[22rem] lg:w-[19rem] lg:max-w-md lg:flex-none lg:border-r xl:w-[26rem] {itemId
 			? 'max-lg:invisible max-lg:absolute max-lg:inset-0'
-			: ''}"
+			: ''} {loadingArticle ? 'max-lg:invisible' : ''}"
 	>
 		<section aria-label={data.viewTitle} class="flex h-full min-w-0 flex-col">
 			<header class="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-5">
@@ -285,7 +321,9 @@
 					<h1 class="sr-only">{data.viewTitle}</h1>
 					<SearchBox value={data.query ?? ''} autofocus={!data.query} class="min-w-0 flex-1" />
 				{:else}
-					<h1 class="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">{data.viewTitle}</h1>
+					<h1 class="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
+						{data.viewTitle}
+					</h1>
 				{/if}
 				<Button
 					variant="ghost"
@@ -303,7 +341,7 @@
 									{...props}
 									variant="ghost"
 									size="sm"
-									disabled={unreadInView === 0}
+									disabled={unreadInView === 0 && !hasMore}
 									aria-label="Mark as read options"
 									><CheckCheck data-icon="inline-start" />Mark read</Button
 								>{/snippet}</DropdownMenu.Trigger
@@ -444,18 +482,56 @@
 			</div>
 		</section>
 	</div>
-	<div class="h-full min-w-0 flex-1 {itemId ? '' : 'hidden lg:block'}">
-		{#if itemId}
-			{@render children()}
-		{:else}
-			<Empty.Root class="h-full"
-				><Empty.Header
-					><Empty.Media variant="icon"><BookOpen /></Empty.Media><Empty.Title
-						>A little space to read</Empty.Title
-					><Empty.Description>Select an article from the list to start reading.</Empty.Description
-					></Empty.Header
-				></Empty.Root
+	<div
+		class="relative h-full min-w-0 flex-1 {itemId
+			? ''
+			: loadingArticle
+				? 'max-lg:absolute max-lg:inset-0'
+				: 'hidden lg:block'}"
+		aria-busy={loadingArticle}
+	>
+		<div
+			class="h-full"
+			inert={loadingArticle}
+			aria-hidden={loadingArticle ? true : undefined}
+			style:visibility={loadingArticle ? 'hidden' : undefined}
+		>
+			{#if itemId}
+				{@render children()}
+			{:else}
+				<Empty.Root class="h-full"
+					><Empty.Header
+						><Empty.Media variant="icon"><BookOpen /></Empty.Media><Empty.Title
+							>A little space to read</Empty.Title
+						><Empty.Description>Select an article from the list to start reading.</Empty.Description
+						></Empty.Header
+					></Empty.Root
+				>
+			{/if}
+		</div>
+		{#if loadingArticle}
+			<div
+				class="absolute inset-0 overflow-hidden bg-background"
+				role="status"
+				aria-label="Loading article"
 			>
+				<span class="sr-only">Loading article…</span>
+				<div aria-hidden="true" class="flex h-16 items-center gap-4 border-b px-5">
+					<Skeleton class="h-5 w-36 motion-reduce:animate-none" />
+				</div>
+				<div
+					aria-hidden="true"
+					class="mx-auto flex max-w-[var(--reader-width,720px)] flex-col gap-7 px-5 py-8 sm:px-10 lg:py-14"
+				>
+					<Skeleton class="h-4 w-28 motion-reduce:animate-none" />
+					<Skeleton class="h-9 w-full motion-reduce:animate-none" />
+					<Skeleton class="h-9 w-3/4 motion-reduce:animate-none" />
+					<Skeleton class="h-4 w-40 motion-reduce:animate-none" />
+					{#each [0, 1, 2, 3, 4, 5] as line (line)}
+						<Skeleton class="h-4 w-full motion-reduce:animate-none" />
+					{/each}
+				</div>
+			</div>
 		{/if}
 	</div>
 </div>
@@ -468,8 +544,16 @@
 >
 	<AlertDialog.Content>
 		<AlertDialog.Header>
-			<AlertDialog.Title>Mark {confirmMark?.count} articles as read?</AlertDialog.Title>
-			<AlertDialog.Description>You can undo this right after.</AlertDialog.Description>
+			<AlertDialog.Title
+				>{hasMore
+					? 'Mark matching articles as read?'
+					: `Mark ${confirmMark?.count} articles as read?`}</AlertDialog.Title
+			>
+			<AlertDialog.Description
+				>{hasMore
+					? 'This applies to the entire view, including articles not loaded yet. You can undo this right after.'
+					: 'You can undo this right after.'}</AlertDialog.Description
+			>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>

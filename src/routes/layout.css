@@ -133,6 +133,64 @@
 	}
 }
 
+/* Only the reader workspace is captured; the shell/sidebar never crossfade. */
+html[data-reader-transition] {
+	view-transition-name: none;
+}
+html[data-reader-transition]::view-transition-group(reader-workspace) {
+	animation: none;
+	overflow: clip;
+}
+html[data-reader-transition]::view-transition-old(reader-workspace),
+html[data-reader-transition]::view-transition-new(reader-workspace) {
+	animation-duration: 180ms;
+	animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+	animation-fill-mode: both;
+	mix-blend-mode: normal;
+}
+html[data-reader-transition='open']::view-transition-old(reader-workspace) {
+	animation-name: reader-list-out;
+}
+html[data-reader-transition='open']::view-transition-new(reader-workspace) {
+	animation-name: reader-article-in;
+}
+html[data-reader-transition='back']::view-transition-old(reader-workspace) {
+	animation-name: reader-article-out;
+}
+html[data-reader-transition='back']::view-transition-new(reader-workspace) {
+	animation-name: reader-list-in;
+}
+@keyframes reader-list-out {
+	to {
+		opacity: 0;
+		transform: translateX(-12px);
+	}
+}
+@keyframes reader-article-in {
+	from {
+		opacity: 0;
+		transform: translateX(20px);
+	}
+}
+@keyframes reader-article-out {
+	to {
+		opacity: 0;
+		transform: translateX(20px);
+	}
+}
+@keyframes reader-list-in {
+	from {
+		opacity: 0;
+		transform: translateX(-12px);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	html[data-reader-transition]::view-transition-old(reader-workspace),
+	html[data-reader-transition]::view-transition-new(reader-workspace) {
+		animation: none;
+	}
+}
+
 @media (pointer: coarse), (display-mode: standalone) {
 	/* Stop native refresh/history overscroll and chaining, not normal scrolling or
      OS edge navigation. Future gestures must still reject edge starts. */

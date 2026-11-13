@@ -1,6 +1,11 @@
 import { parseHTML } from 'linkedom';
-import { describe, expect, it } from 'vitest';
-import { SwipeTracker, startsInHorizontalOwner, type Step } from './swipe-navigation';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+	SwipeTracker,
+	startsInHorizontalOwner,
+	swipeNavigation,
+	type Step
+} from './swipe-navigation';
 
 function tracker(allowed: (step: Step) => boolean = () => true, width = 390) {
 	return new SwipeTracker({ canStep: allowed, viewportWidth: () => width });
@@ -70,6 +75,129 @@ describe('swipe tracker (touch emulation at a 390 px phone width)', () => {
 	);
 	it('ignores a gesture that starts blocked (selection or horizontal scroller)', () => {
 		expect(tracker().down(200, 300, 0, true)).toBe(false);
+	});
+});
+
+describe('swipe attachment animation budget', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
+	});
+
+	function setup(reduced = false) {
+		vi.stubGlobal('matchMedia', () => ({ matches: reduced }));
+		vi.stubGlobal('window', { innerWidth: 390 });
+		vi.stubGlobal('getSelection', () => null);
+		vi.stubGlobal('getComputedStyle', (el: HTMLElement) => ({ transform: el.style.transform }));
+		vi.stubGlobal(
+			'DOMMatrixReadOnly',
+			class {
+				m41: number;
+				constructor(transform: string) {
+					this.m41 = Number(/translate3d\((-?[\d.]+)px/.exec(transform)?.[1] ?? 0);
+				}
+			}
+		);
+		const animation = { cancel: vi.fn(), onfinish: null as (() => void) | null };
+		const node = Object.assign(new EventTarget(), {
+			style: { transform: '' },
+			clientWidth: 390,
+			setPointerCapture: vi.fn(),
+			animate: vi.fn(() => animation)
+		});
+		const commit = vi.fn(async () => false);
+		const warm = vi.fn();
+		const detach = swipeNavigation(node as unknown as HTMLElement, () => ({
+			canStep: () => true,
+			commit,
+			warm
+		}));
+		function pointer(type: string, x: number, y = 300) {
+			const event = new Event(type);
+			Object.defineProperties(event, {
+				pointerType: { value: 'touch' },
+				pointerId: { value: 1 },
+				clientX: { value: x },
+				clientY: { value: y }
+			});
+			node.dispatchEvent(event);
+		}
+		return { node, animation, pointer, commit, warm, detach };
+	}
+
+	it('warms on touch start and only animates transforms when committing a swipe', async () => {
+		const { node, animation, pointer, warm, commit, detach } = setup();
+		pointer('pointerdown', 300);
+		expect(warm).toHaveBeenCalledOnce();
+		pointer('pointermove', 180);
+		expect(node.style.transform).toBe('translate3d(-120px,0,0)');
+		pointer('pointerup', 180);
+		expect(commit).not.toHaveBeenCalled();
+		expect(node.animate).toHaveBeenCalledWith(
+			[{ transform: 'translate3d(-120px,0,0)' }, { transform: 'translate3d(-390px,0,0)' }],
+			{ duration: 160, easing: 'ease-out' }
+		);
+		animation.onfinish?.();
+		await Promise.resolve();
+		expect(commit).toHaveBeenCalledWith(1);
+		detach();
+		expect(node.style.transform).toBe('');
+		expect(animation.cancel).toHaveBeenCalled();
+	});
+
+	it('keeps navigation working without drag or slide animation under reduced motion', async () => {
+		const { node, pointer, commit, detach } = setup(true);
+		pointer('pointerdown', 300);
+		pointer('pointermove', 180);
+		expect(node.style.transform).toBe('');
+		pointer('pointerup', 180);
+		await Promise.resolve();
+		expect(commit).toHaveBeenCalledWith(1);
+		expect(node.animate).not.toHaveBeenCalled();
+		detach();
+	});
+
+	it('leaves vertical scrolling alone and removes listeners on teardown', () => {
+		const { node, pointer, commit, warm, detach } = setup();
+		pointer('pointerdown', 200);
+		pointer('pointermove', 202, 400);
+		pointer('pointerup', 202, 400);
+		expect(node.style.transform).toBe('');
+		expect(node.animate).not.toHaveBeenCalled();
+		expect(commit).not.toHaveBeenCalled();
+		detach();
+		pointer('pointerdown', 200);
+		expect(warm).toHaveBeenCalledOnce();
+	});
+
+	it('suppresses the synthetic click after a swipe but lets later taps through', async () => {
+		const clock = vi.spyOn(performance, 'now').mockReturnValue(1000);
+		const { node, pointer, detach } = setup(true);
+		pointer('pointerdown', 300);
+		pointer('pointermove', 180);
+		pointer('pointerup', 180);
+		await Promise.resolve();
+		const synthetic = new Event('click', { cancelable: true });
+		node.dispatchEvent(synthetic);
+		expect(synthetic.defaultPrevented).toBe(true);
+		clock.mockReturnValue(1400);
+		const tap = new Event('click', { cancelable: true });
+		node.dispatchEvent(tap);
+		expect(tap.defaultPrevented).toBe(false);
+		detach();
+	});
+
+	it('cancels a drag with a transform-only snap-back and never navigates', () => {
+		const { node, pointer, commit, detach } = setup();
+		pointer('pointerdown', 300);
+		pointer('pointermove', 250);
+		pointer('pointercancel', 250);
+		expect(node.animate).toHaveBeenCalledWith(
+			[{ transform: 'translate3d(-50px,0,0)' }, { transform: 'translate3d(0px,0,0)' }],
+			{ duration: 160, easing: 'ease-out' }
+		);
+		expect(commit).not.toHaveBeenCalled();
+		detach();
 	});
 });
 
