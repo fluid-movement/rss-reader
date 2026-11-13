@@ -2,6 +2,8 @@
 	/* eslint svelte/no-navigation-without-resolve: off -- Dynamic links and future issue routes append to the resolved app root; existing routes use resolve directly. */
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { enhance, type SubmitFunction } from '$app/forms';
+	import * as Alert from '#lib/components/ui/alert/index.js';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -21,6 +23,33 @@
 		Monitor
 	} from '@lucide/svelte';
 	let { data }: { data: ShellData } = $props();
+	let refreshing = $state(false);
+	let refreshMessage = $state('');
+	let refreshFailed = $state(false);
+	const refreshAll: SubmitFunction = ({ cancel }) => {
+		if (refreshing) {
+			cancel();
+			return;
+		}
+		refreshing = true;
+		refreshMessage = '';
+		return async ({ result, update }) => {
+			try {
+				if (result.type === 'success' || result.type === 'failure') {
+					refreshFailed = result.type === 'failure' || result.data?.success === false;
+					refreshMessage =
+						typeof result.data?.message === 'string'
+							? result.data.message
+							: refreshFailed
+								? 'Could not refresh feeds. Try again.'
+								: 'Feeds refreshed.';
+				}
+				await update({ navigate: false, refreshAll: true });
+			} finally {
+				refreshing = false;
+			}
+		};
+	};
 	const views = [
 		{ title: 'All articles', href: '/', icon: Inbox },
 		{ title: 'Unread', href: '/unread', icon: Mail },
@@ -40,6 +69,23 @@
 			class="flex items-center gap-2 text-base font-semibold tracking-tight"
 			><Rss class="size-5" /> RSS Reader</a
 		>
+		<form
+			method="POST"
+			action={`${resolve('/feeds')}?/refreshAll`}
+			use:enhance={refreshAll}
+			aria-busy={refreshing}
+		>
+			<Button type="submit" variant="outline" size="sm" class="w-full" disabled={refreshing}>
+				{refreshing ? 'Refreshing…' : 'Refresh all'}
+			</Button>
+		</form>
+		<div role="status" aria-live="polite">
+			{#if refreshMessage}
+				<Alert.Root variant={refreshFailed ? 'destructive' : 'default'}>
+					<Alert.Description>{refreshMessage}</Alert.Description>
+				</Alert.Root>
+			{/if}
+		</div>
 	</Sidebar.Header>
 	<Sidebar.Content>
 		<nav aria-label="Reader navigation">

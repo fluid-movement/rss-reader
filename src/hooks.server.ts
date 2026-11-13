@@ -5,9 +5,13 @@ import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { redirect } from '@sveltejs/kit';
 import { db } from '#lib/server/db/index.ts';
 import { migrateDatabase } from '#lib/server/db/migrate.ts';
+import { startScheduler } from '#lib/server/scheduler.ts';
 
 export function init() {
-	if (!building) migrateDatabase(db);
+	if (!building) {
+		migrateDatabase(db);
+		startScheduler(db);
+	}
 }
 
 const handleBetterAuth: Handle = async ({ event, resolve }) => {

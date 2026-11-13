@@ -39,6 +39,17 @@ beforeEach(() => {
 afterEach(() => connection.client.close());
 
 describe('subscription and immediate ingestion', () => {
+	it('stores the same 30-minute refresh default for discovered and OPML-queued feeds', async () => {
+		const subscribed = await service.subscribeToFeed('owner', 'https://example.com/rss');
+		vi.mocked(safeFetch).mockClear();
+		expect(service.queueFeed('owner', 'https://example.com/imported', 'Imported')).toBe(1);
+		const queued = service
+			.list('owner')
+			.feeds.find((feed) => feed.url === 'https://example.com/imported');
+		expect(subscribed.refreshIntervalMinutes).toBe(30);
+		expect(queued?.refreshIntervalMinutes).toBe(30);
+		expect(safeFetch).not.toHaveBeenCalled();
+	});
 	it('discovers a website feed, ingests immediately and deduplicates repeat subscriptions', async () => {
 		const folder = service.createFolder('owner', 'News');
 		const feed = await service.subscribeToFeed('owner', 'https://example.com/', folder.id);
@@ -48,6 +59,8 @@ describe('subscription and immediate ingestion', () => {
 			etag: 'v1'
 		});
 		expect(feed.lastFetchedAt).toBeInstanceOf(Date);
+		expect(feed.refreshIntervalMinutes).toBe(30);
+		expect(feed.nextFetchAt!.getTime() - feed.lastFetchedAt!.getTime()).toBe(30 * 60_000);
 		expect(connection.db.select().from(items).all()).toHaveLength(3);
 		expect((await service.subscribeToFeed('owner', 'https://example.com/')).id).toBe(feed.id);
 		expect(service.list('owner').feeds).toHaveLength(1);

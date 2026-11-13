@@ -7,6 +7,8 @@ import { sanitizeContent, type ParsedItem } from './parse';
 
 export class FeedValidationError extends Error {}
 
+const DEFAULT_REFRESH_MINUTES = 30;
+
 /** Injectable database boundary keeps tests isolated from the application database. */
 export function createFeedService(db: AppDatabase) {
 	function requireFolder(userId: string, folderId?: string | null) {
@@ -89,6 +91,7 @@ export function createFeedService(db: AppDatabase) {
 					userId,
 					url,
 					title: title || url,
+					refreshIntervalMinutes: DEFAULT_REFRESH_MINUTES,
 					folderId: folderId || null,
 					nextFetchAt: new Date()
 				})
@@ -122,12 +125,13 @@ export function createFeedService(db: AppDatabase) {
 						userId,
 						url: discovered.url,
 						title: discovered.feed.title,
+						refreshIntervalMinutes: DEFAULT_REFRESH_MINUTES,
 						siteUrl: discovered.feed.siteUrl,
 						folderId: folderId || null,
 						etag: discovered.response.headers.get('etag'),
 						lastModified: discovered.response.headers.get('last-modified'),
 						lastFetchedAt: now,
-						nextFetchAt: new Date(now.getTime() + 60 * 60 * 1000)
+						nextFetchAt: new Date(now.getTime() + DEFAULT_REFRESH_MINUTES * 60 * 1000)
 					})
 					.onConflictDoNothing({ target: [feeds.userId, feeds.url] })
 					.run();

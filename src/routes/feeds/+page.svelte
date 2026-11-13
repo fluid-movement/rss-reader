@@ -3,6 +3,7 @@
 	import OpmlPanel from '#lib/components/opml-panel.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
@@ -11,20 +12,24 @@
 
 	let { data, form }: PageProps = $props();
 	let pending = $state(false);
+	let refreshingFeedId = $state<string | null>(null);
 
-	const submit: SubmitFunction = ({ cancel, action }) => {
+	const submit: SubmitFunction = ({ cancel, action, formData }) => {
 		if (pending) {
 			cancel();
 			return;
 		}
 		pending = true;
+		refreshingFeedId = action.search === '?/refreshFeed' ? String(formData.get('feedId')) : null;
 		return async ({ update }) => {
 			try {
 				await update({
-					reset: action.search === '?/subscribe' || action.search === '?/createFolder'
+					reset: action.search === '?/subscribe' || action.search === '?/createFolder',
+					...(action.search === '?/refreshFeed' ? { refreshAll: true } : {})
 				});
 			} finally {
 				pending = false;
+				refreshingFeedId = null;
 			}
 		};
 	};
@@ -42,7 +47,9 @@
 
 	<div role="status" aria-live="polite">
 		{#if pending}
-			<p class="text-sm text-muted-foreground">Saving changes…</p>
+			<p class="text-sm text-muted-foreground">
+				{refreshingFeedId ? 'Refreshing feed…' : 'Saving changes…'}
+			</p>
 		{:else if form?.message || form?.success}
 			<Alert.Root variant={form?.success ? 'default' : 'destructive'}>
 				<Alert.Title>{form?.success ? 'Changes saved' : 'Could not save changes'}</Alert.Title>
@@ -107,8 +114,30 @@
 				{#each data.feeds as feed (feed.id)}
 					<li class="flex min-w-0 flex-col gap-3">
 						<div class="min-w-0">
-							<h3 class="font-medium break-words">{feed.title || feed.url}</h3>
+							<div class="flex flex-wrap items-center gap-2">
+								<h3 class="font-medium break-words">{feed.title || feed.url}</h3>
+								{#if feed.errorCount >= 3}
+									<Badge variant="destructive">Broken</Badge>
+								{/if}
+							</div>
 							<p class="text-sm break-all text-muted-foreground">{feed.url}</p>
+							<p class="text-sm text-muted-foreground">
+								Last fetched:
+								{#if feed.lastFetchedAt}
+									<time
+										datetime={new Date(feed.lastFetchedAt).toISOString()}
+										title={new Date(feed.lastFetchedAt).toISOString()}
+										>{new Date(feed.lastFetchedAt).toLocaleString('en-US', {
+											dateStyle: 'medium',
+											timeStyle: 'short',
+											timeZone: 'UTC'
+										})} UTC</time
+									>
+								{:else}Never{/if}
+							</p>
+							{#if feed.lastError}
+								<p class="text-sm break-words text-destructive">Last error: {feed.lastError}</p>
+							{/if}
 						</div>
 						<div class="flex flex-wrap items-end gap-3">
 							<form method="POST" action="?/moveFeed" use:enhance={submit} class="min-w-0 flex-1">
@@ -137,6 +166,17 @@
 										aria-label={`Save folder for ${feed.title || feed.url}`}>Save folder</Button
 									>
 								</Field.Group>
+							</form>
+							<form method="POST" action="?/refreshFeed" use:enhance={submit}>
+								<input type="hidden" name="feedId" value={feed.id} />
+								<Button
+									type="submit"
+									variant="outline"
+									disabled={pending}
+									aria-label={`Refresh feed ${feed.title || feed.url}`}
+								>
+									{refreshingFeedId === feed.id ? 'Refreshing…' : 'Refresh feed'}
+								</Button>
 							</form>
 							<form method="POST" action="?/removeFeed" use:enhance={submit}>
 								<input type="hidden" name="feedId" value={feed.id} />
