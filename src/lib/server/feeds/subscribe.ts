@@ -2,6 +2,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/connect';
 import { feeds, folders, items } from '../db/schema';
 import { discoverFeed } from './discover';
+import { normalizeFeedUrl } from './normalize-url';
 import { sanitizeContent, type ParsedItem } from './parse';
 
 export class FeedValidationError extends Error {}
@@ -74,6 +75,26 @@ export function createFeedService(db: AppDatabase) {
 
 	return {
 		ingestItems,
+		/** OPML subscriptions are queued without discovery or network access. */
+		queueFeed(userId: string, url: string, title: string, folderId?: string) {
+			requireFolder(userId, folderId);
+			try {
+				url = normalizeFeedUrl(url);
+			} catch {
+				throw new FeedValidationError('Enter a valid HTTP(S) feed URL.');
+			}
+			return db
+				.insert(feeds)
+				.values({
+					userId,
+					url,
+					title: title || url,
+					folderId: folderId || null,
+					nextFetchAt: new Date()
+				})
+				.onConflictDoNothing({ target: [feeds.userId, feeds.url] })
+				.run().changes;
+		},
 		list(userId: string) {
 			return {
 				feeds: db

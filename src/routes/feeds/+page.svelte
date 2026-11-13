@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance, type SubmitFunction } from '$app/forms';
+	import OpmlPanel from '#lib/components/opml-panel.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -90,6 +91,8 @@
 			<Button type="submit" form="subscribe-feed" disabled={pending}>Subscribe</Button>
 		</Card.Footer>
 	</Card.Root>
+
+	<OpmlPanel />
 
 	<Card.Root>
 		<Card.Header>
