@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	adjacentIndex,
+	refreshMessageKind,
 	refreshTarget,
 	resolveShortcut,
 	safeOriginalLink,
@@ -147,5 +148,23 @@ describe('refreshTarget', () => {
 		expect(refreshTarget({ view: 'all', viewId: null })).toEqual({ kind: 'all' });
 		expect(refreshTarget({ view: 'folder', viewId: 'x' })).toEqual({ kind: 'all' });
 		expect(refreshTarget(null)).toBeNull();
+	});
+});
+
+describe('refreshMessageKind', () => {
+	it('maps refresh results to toast kinds', () => {
+		expect(refreshMessageKind(undefined)).toBe('success');
+		expect(refreshMessageKind('Feed refreshed.')).toBe('success');
+		expect(refreshMessageKind('Refreshed recently, try again in a moment.')).toBe('info');
+		expect(
+			refreshMessageKind(
+				'Refreshed: 0. Skipped: 42. Failed: 0. Refreshed recently, try again in a moment.'
+			)
+		).toBe('info');
+		expect(refreshMessageKind('Refreshed: 3. Skipped: 2. Failed: 0.')).toBe('success');
+		expect(refreshMessageKind('Refreshed: 0. Skipped: 5. Failed: 1. See refresh errors')).toBe(
+			'warning'
+		);
+		expect(refreshMessageKind('Feed refresh failed. See the error below.')).toBe('warning');
 	});
 });

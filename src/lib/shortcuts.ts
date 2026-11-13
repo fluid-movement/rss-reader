@@ -112,6 +112,17 @@ export function refreshTarget(
 		: { kind: 'all' };
 }
 
+/** Toast kind for a successful refresh action message. Per-feed failures win; a run where
+ * everything was skipped by the cooldown is info, not success. */
+export function refreshMessageKind(message: string | undefined): 'success' | 'info' | 'warning' {
+	if (!message) return 'success';
+	if (/Failed: [1-9]/.test(message) || message.includes('refresh failed')) return 'warning';
+	if (message === 'Refreshed recently, try again in a moment.') return 'info';
+	const counts = /Refreshed: (\d+)\. Skipped: (\d+)\./.exec(message);
+	if (counts && Number(counts[1]) === 0 && Number(counts[2]) > 0) return 'info';
+	return 'success';
+}
+
 /** Only web links are opened from the keyboard. */
 export function safeOriginalLink(link: string | null | undefined): string | null {
 	if (!link) return null;

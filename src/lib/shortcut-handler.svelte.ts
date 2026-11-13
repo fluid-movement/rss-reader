@@ -5,6 +5,7 @@ import { toast } from 'svelte-sonner';
 import { isRead, isStarred, updateArticle } from '#lib/reader-state.svelte.ts';
 import {
 	adjacentIndex,
+	refreshMessageKind,
 	refreshTarget,
 	resolveShortcut,
 	safeOriginalLink,
@@ -23,6 +24,8 @@ export interface ReaderShortcutContext {
 	selected:
 		| { id: string; feedId: string; read: boolean; starred: boolean; link?: string | null }
 		| undefined;
+	/** Feeds of the open folder (folder views only): refreshed one by one. */
+	folderFeedIds?: string[];
 	hasMore: boolean;
 	loadMore: () => Promise<string[] | null>;
 	hrefFor: (id: string) => string;
@@ -34,33 +37,66 @@ export function setReaderShortcutContext(next: ReaderShortcutContext | null) {
 	context = next;
 }
 
-let refreshing = false;
+let refreshing = $state(false);
 
-async function refresh() {
+/** True while a refresh started from the list (button, pull or `r`) is running. */
+export function isRefreshing() {
+	return refreshing;
+}
+
+/** Whether the list on screen can be refreshed. */
+export function canRefresh() {
+	return refreshTarget(context) !== null;
+}
+
+type RefreshOutcome = { kind: 'success' | 'info' | 'warning' | 'error'; message: string };
+
+async function post(
+	action: 'refreshFeed' | 'refreshAll',
+	feedId?: string
+): Promise<RefreshOutcome> {
+	const body = new FormData();
+	if (feedId) body.set('feedId', feedId);
+	const response = await fetch(`${resolve('/(app)/feeds')}?/${action}`, {
+		method: 'POST',
+		body,
+		headers: { 'x-sveltekit-action': 'true' }
+	});
+	const result = deserialize(await response.text());
+	const message =
+		(result.type === 'success' || result.type === 'failure') &&
+		typeof result.data?.message === 'string'
+			? result.data.message
+			: undefined;
+	if (result.type === 'success' && result.data?.success !== false) {
+		// The action reports per-feed failures inside a successful result.
+		return { kind: refreshMessageKind(message), message: message ?? 'Refreshed.' };
+	}
+	return { kind: 'error', message: message ?? 'Could not refresh. Try again.' };
+}
+
+/** Refresh the open view with the existing refresh actions: a feed, the feeds of a folder, or
+ * everything. Shows one result toast and reloads the list data (scroll and open article stay). */
+export async function refresh() {
 	if (refreshing) return;
-	if (!refreshTarget(context)) return;
-	refreshing = true;
 	const target = refreshTarget(context);
 	if (!target) return;
-	const feedView = target.kind === 'feed';
-	const body = new FormData();
-	if (target.kind === 'feed') body.set('feedId', target.id);
+	refreshing = true;
 	try {
-		const response = await fetch(
-			`${resolve('/(app)/feeds')}?/${feedView ? 'refreshFeed' : 'refreshAll'}`,
-			{ method: 'POST', body, headers: { 'x-sveltekit-action': 'true' } }
-		);
-		const result = deserialize(await response.text());
-		const message =
-			(result.type === 'success' || result.type === 'failure') &&
-			typeof result.data?.message === 'string'
-				? result.data.message
-				: undefined;
-		if (result.type === 'success' && result.data?.success !== false) {
-			// The action reports per-feed failures inside a successful result.
-			if (message && /Failed: [1-9]/.test(message)) toast.warning(message);
-			else toast.success(message ?? 'Refreshed.');
-		} else toast.error(message ?? 'Could not refresh. Try again.');
+		let outcome: RefreshOutcome;
+		const folderFeeds = context?.view === 'folder' ? context.folderFeedIds : undefined;
+		if (target.kind === 'feed') outcome = await post('refreshFeed', target.id);
+		else if (folderFeeds) {
+			const outcomes = [];
+			for (const id of folderFeeds) outcomes.push(await post('refreshFeed', id));
+			const worst =
+				outcomes.find((o) => o.kind === 'error') ??
+				outcomes.find((o) => o.kind === 'warning') ??
+				outcomes.find((o) => o.kind === 'success') ??
+				outcomes[0];
+			outcome = worst ?? { kind: 'info', message: 'No feeds in this folder.' };
+		} else outcome = await post('refreshAll');
+		toast[outcome.kind](outcome.message);
 		await invalidateAll();
 	} catch {
 		toast.error('Could not refresh. Try again.');

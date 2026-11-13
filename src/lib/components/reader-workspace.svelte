@@ -4,7 +4,16 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { enhance, type SubmitFunction } from '$app/forms';
-	import { BookOpen, Rss, Search, Star, Circle, CheckCheck, TriangleAlert } from '@lucide/svelte';
+	import {
+		BookOpen,
+		Rss,
+		Search,
+		Star,
+		Circle,
+		CheckCheck,
+		RefreshCw,
+		TriangleAlert
+	} from '@lucide/svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { feedFailure } from '#lib/reader.ts';
 	import { toast } from 'svelte-sonner';
@@ -15,7 +24,15 @@
 	import { ScrollArea } from '#lib/components/ui/scroll-area/index.js';
 	import SearchBox from '#lib/components/search-box.svelte';
 	import { itemHref } from '#lib/reader-paths.ts';
-	import { setReaderShortcutContext } from '#lib/shortcut-handler.svelte.ts';
+	import {
+		canRefresh,
+		isRefreshing,
+		refresh,
+		setReaderShortcutContext
+	} from '#lib/shortcut-handler.svelte.ts';
+	import { attachPullToRefresh } from '#lib/pull-refresh.ts';
+	import PullRefreshIndicator from '#lib/components/pull-refresh-indicator.svelte';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { EXTRA_PAGE_SIZE, loadChunked, withOpenArticle } from '#lib/reader-list.ts';
 	import ArticleRow from '#lib/components/article-row.svelte';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
@@ -171,6 +188,12 @@
 			articleIds: articles.map((article) => article.id),
 			selectedId: itemId,
 			selected: selectedItem ?? articles.find((article) => article.id === itemId),
+			folderFeedIds:
+				data.view === 'folder'
+					? (page.data as Pick<ShellData, 'feeds'>).feeds
+							?.filter((feed) => feed.folderId === data.viewId)
+							.map((feed) => feed.id)
+					: undefined,
 			hasMore,
 			loadMore: async () => {
 				await loadMore();
@@ -179,6 +202,20 @@
 			hrefFor: (id) => itemHref(data, id)
 		});
 		return () => setReaderShortcutContext(null);
+	});
+
+	// Pull down at the top of the list to refresh (phones). One touch coordinator on the scroll
+	// viewport; row swipes and the drawer never reach it as downward vertical pulls.
+	let viewport = $state<HTMLElement | null>(null);
+	let pull = $state<{ offset: number; armed: boolean } | null>(null);
+	let refreshing = $derived(isRefreshing());
+	$effect(() => {
+		if (!viewport) return;
+		return attachPullToRefresh(viewport, {
+			onPull: (move) => (pull = move),
+			onRefresh: () => void refresh(),
+			enabled: () => canRefresh() && !isRefreshing()
+		});
 	});
 
 	// Keep the open row visible without moving the list otherwise (also for keyboard j/k).
@@ -248,8 +285,18 @@
 					<h1 class="sr-only">{data.viewTitle}</h1>
 					<SearchBox value={data.query ?? ''} autofocus={!data.query} class="min-w-0 flex-1" />
 				{:else}
-					<h1 class="truncate text-lg font-semibold tracking-tight">{data.viewTitle}</h1>
+					<h1 class="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">{data.viewTitle}</h1>
 				{/if}
+				<Button
+					variant="ghost"
+					size="icon"
+					class="shrink-0"
+					aria-label="Refresh"
+					disabled={refreshing}
+					aria-busy={refreshing}
+					onclick={() => void refresh()}
+					>{#if refreshing}<Spinner />{:else}<RefreshCw />{/if}</Button
+				>
 				{#if data.view !== 'search'}<DropdownMenu.Root>
 						<DropdownMenu.Trigger
 							>{#snippet child({ props })}<Button
@@ -278,112 +325,123 @@
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>{/if}
 			</header>
-			<ScrollArea class="min-h-0 flex-1">
-				{#if failure}
-					<div class="p-3">
-						<Alert.Root variant="destructive">
-							<TriangleAlert />
-							<Alert.Title>Could not refresh feed</Alert.Title>
-							<Alert.Description class="min-w-0">
-								<p class="[overflow-wrap:anywhere]">{failure}</p>
-								<form
-									method="POST"
-									action={`${resolve('/(app)/feeds')}?/refreshFeed`}
-									use:enhance={retry}
-									aria-busy={retrying}
-								>
-									<input type="hidden" name="feedId" value={data.viewId} />
-									<Button type="submit" variant="outline" size="sm" disabled={retrying}
-										>{retrying ? 'Retrying…' : 'Retry'}</Button
+			<div class="relative min-h-0 flex-1 overflow-hidden">
+				<PullRefreshIndicator
+					offset={pull?.offset ?? null}
+					armed={pull?.armed ?? false}
+					{refreshing}
+				/>
+				<ScrollArea class="h-full" bind:viewportRef={viewport}>
+					{#if failure}
+						<div class="p-3">
+							<Alert.Root variant="destructive">
+								<TriangleAlert />
+								<Alert.Title>Could not refresh feed</Alert.Title>
+								<Alert.Description class="min-w-0">
+									<p class="[overflow-wrap:anywhere]">{failure}</p>
+									<form
+										method="POST"
+										action={`${resolve('/(app)/feeds')}?/refreshFeed`}
+										use:enhance={retry}
+										aria-busy={retrying}
 									>
-								</form>
-							</Alert.Description>
-						</Alert.Root>
-					</div>
-				{/if}
-				{#if articles.length}
-					<Item.Group class="min-w-0 p-2" bind:ref={listElement}>
-						{#each articles as article, index (article.id)}
-							{@const read = isRead(article)}
-							<ArticleRow
-								{article}
-								{read}
-								starred={isStarred(article)}
-								href={itemHref(data, article.id)}
-								selected={itemId === article.id}
-								above={() => articles.slice(0, index)}
-								below={() => articles.slice(index + 1)}
-							>
-								<Item.Content>
-									<div
-										class="flex items-center justify-between gap-3 text-xs text-muted-foreground"
-									>
-										<span class="flex min-w-0 items-center gap-1.5">
-											{#if !read}<Circle
-													class="size-2 shrink-0 fill-primary text-primary"
-													aria-label="Unread"
-												/>{/if}
-											<span class="truncate">{article.feedTitle}</span>
-										</span>
-										<span class="flex shrink-0 items-center gap-2">
-											{#if isStarred(article)}<Star
-													class="size-3.5 fill-current text-amber-500"
-													aria-label="Starred"
-												/>{/if}
-											{#if article.publishedAt}<time datetime={article.publishedAt.toISOString()}
-													>{dateLabel(article.publishedAt)}</time
-												>{/if}
-										</span>
-									</div>
-									<Item.Title class={read ? 'font-normal text-muted-foreground' : 'font-semibold'}>
-										{#if article.titleParts}{@render parts(
-												article.titleParts
-											)}{:else}{article.title}{/if}
-									</Item.Title>
-									{#if article.snippetParts}<Item.Description>
-											{@render parts(article.snippetParts)}
-										</Item.Description>{:else if article.summary}<Item.Description>
-											{article.summary}
-										</Item.Description>{/if}
-								</Item.Content>
-							</ArticleRow>
-						{/each}
-					</Item.Group>
-					{#if hasMore}
-						<div class="flex justify-center p-3">
-							<Button variant="outline" size="sm" disabled={loadingMore} onclick={loadMore}
-								>{loadingMore ? 'Loading…' : 'Load more'}</Button
-							>
+										<input type="hidden" name="feedId" value={data.viewId} />
+										<Button type="submit" variant="outline" size="sm" disabled={retrying}
+											>{retrying ? 'Retrying…' : 'Retry'}</Button
+										>
+									</form>
+								</Alert.Description>
+							</Alert.Root>
 						</div>
 					{/if}
-				{:else if data.view === 'search'}
-					<Empty.Root class="py-16"
-						><Empty.Header
-							><Empty.Media variant="icon"><Search /></Empty.Media><Empty.Title
-								>{data.query ? 'No results' : 'Search your articles'}</Empty.Title
-							><Empty.Description
-								>{data.query
-									? `Nothing matched “${data.query}”. Try different or fewer words.`
-									: 'Type a word or phrase to search titles and article text.'}</Empty.Description
-							></Empty.Header
-						></Empty.Root
-					>
-				{:else}
-					<Empty.Root class="py-16"
-						><Empty.Header
-							><Empty.Media variant="icon"><Rss /></Empty.Media><Empty.Title
-								>{data.hasFeeds ? 'No articles here yet' : 'Your reading space awaits'}</Empty.Title
-							><Empty.Description
-								>{data.hasFeeds
-									? 'Articles in this view will appear here when available.'
-									: 'Add your first feed to start following the sites you love.'}</Empty.Description
-							></Empty.Header
-						>{#if !data.hasFeeds}<Empty.Content
-								><Button href={resolve('/(app)/feeds')}>Add a feed</Button></Empty.Content
-							>{/if}</Empty.Root
-					>
-				{/if}
-			</ScrollArea>
+					{#if articles.length}
+						<Item.Group class="min-w-0 p-2" bind:ref={listElement}>
+							{#each articles as article, index (article.id)}
+								{@const read = isRead(article)}
+								<ArticleRow
+									{article}
+									{read}
+									starred={isStarred(article)}
+									href={itemHref(data, article.id)}
+									selected={itemId === article.id}
+									above={() => articles.slice(0, index)}
+									below={() => articles.slice(index + 1)}
+								>
+									<Item.Content>
+										<div
+											class="flex items-center justify-between gap-3 text-xs text-muted-foreground"
+										>
+											<span class="flex min-w-0 items-center gap-1.5">
+												{#if !read}<Circle
+														class="size-2 shrink-0 fill-primary text-primary"
+														aria-label="Unread"
+													/>{/if}
+												<span class="truncate">{article.feedTitle}</span>
+											</span>
+											<span class="flex shrink-0 items-center gap-2">
+												{#if isStarred(article)}<Star
+														class="size-3.5 fill-current text-amber-500"
+														aria-label="Starred"
+													/>{/if}
+												{#if article.publishedAt}<time datetime={article.publishedAt.toISOString()}
+														>{dateLabel(article.publishedAt)}</time
+													>{/if}
+											</span>
+										</div>
+										<Item.Title
+											class={read ? 'font-normal text-muted-foreground' : 'font-semibold'}
+										>
+											{#if article.titleParts}{@render parts(
+													article.titleParts
+												)}{:else}{article.title}{/if}
+										</Item.Title>
+										{#if article.snippetParts}<Item.Description>
+												{@render parts(article.snippetParts)}
+											</Item.Description>{:else if article.summary}<Item.Description>
+												{article.summary}
+											</Item.Description>{/if}
+									</Item.Content>
+								</ArticleRow>
+							{/each}
+						</Item.Group>
+						{#if hasMore}
+							<div class="flex justify-center p-3">
+								<Button variant="outline" size="sm" disabled={loadingMore} onclick={loadMore}
+									>{loadingMore ? 'Loading…' : 'Load more'}</Button
+								>
+							</div>
+						{/if}
+					{:else if data.view === 'search'}
+						<Empty.Root class="py-16"
+							><Empty.Header
+								><Empty.Media variant="icon"><Search /></Empty.Media><Empty.Title
+									>{data.query ? 'No results' : 'Search your articles'}</Empty.Title
+								><Empty.Description
+									>{data.query
+										? `Nothing matched “${data.query}”. Try different or fewer words.`
+										: 'Type a word or phrase to search titles and article text.'}</Empty.Description
+								></Empty.Header
+							></Empty.Root
+						>
+					{:else}
+						<Empty.Root class="py-16"
+							><Empty.Header
+								><Empty.Media variant="icon"><Rss /></Empty.Media><Empty.Title
+									>{data.hasFeeds
+										? 'No articles here yet'
+										: 'Your reading space awaits'}</Empty.Title
+								><Empty.Description
+									>{data.hasFeeds
+										? 'Articles in this view will appear here when available.'
+										: 'Add your first feed to start following the sites you love.'}</Empty.Description
+								></Empty.Header
+							>{#if !data.hasFeeds}<Empty.Content
+									><Button href={resolve('/(app)/feeds')}>Add a feed</Button></Empty.Content
+								>{/if}</Empty.Root
+						>
+					{/if}
+				</ScrollArea>
+			</div>
 		</section>
 	</div>
 	<div class="h-full min-w-0 flex-1 {itemId ? '' : 'hidden lg:block'}">
