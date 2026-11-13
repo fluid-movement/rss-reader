@@ -1,5 +1,5 @@
-- [ ] Swiping left in the article view opens the next article and swiping right the previous one in the order of the originating list, including across the Load more boundary, verified with touch emulation on a phone viewport
-- [ ] The article follows the finger with commit/snap-back thresholds, reduced-motion shows an instant change, and the first/last article does not navigate
-- [ ] Vertical scroll, horizontally scrollable tables and code, text selection and gestures starting within 28 px of either screen edge do not trigger article changes (automated touch tests for each case)
-- [ ] Prev/next buttons and a position indicator exist and work, j/k stay in sync, and the browser Back from any article returns to the list in one step with scroll position preserved
-- [ ] Mark-read-on-open, optimistic state and sync keep working; neighbor data is preloaded without refetching the list; pnpm check and pnpm test pass
+- [x] Swiping left in the article view opens the next article and swiping right the previous one in the order of the originating list, including across the Load more boundary, verified with touch emulation on a phone viewport
+- [x] The article follows the finger with commit/snap-back thresholds, reduced-motion shows an instant change, and the first/last article does not navigate
+- [x] Vertical scroll, horizontally scrollable tables and code, text selection and gestures starting within 28 px of either screen edge do not trigger article changes (automated touch tests for each case)
+- [x] Prev/next buttons and a position indicator exist and work, j/k stay in sync, and the browser Back from any article returns to the list in one step with scroll position preserved
+- [x] Mark-read-on-open, optimistic state and sync keep working; neighbor data is preloaded without refetching the list; pnpm check and pnpm test pass
