@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/connect';
-import { feeds, folders, items } from '../db/schema';
+import { feeds, folders, items, prunedItems } from '../db/schema';
 import { discoverFeed } from './discover';
 import { normalizeFeedUrl } from './normalize-url';
 import { sanitizeContent, type ParsedItem } from './parse';
@@ -52,7 +52,15 @@ export function createFeedService(db: AppDatabase) {
 				.from(items)
 				.where(eq(items.feedId, feedId))
 				.all();
-			const guids = new Set(existing.map((item) => item.guid));
+			// Retention pruning leaves a tombstone per deleted item (see retention.ts). Treating those
+			// GUIDs as already seen keeps a pruned item that is still in the feed from coming back
+			// as a new unread item (and from being extracted again).
+			const tombstones = tx
+				.select({ guid: prunedItems.guid })
+				.from(prunedItems)
+				.where(eq(prunedItems.feedId, feedId))
+				.all();
+			const guids = new Set([...existing, ...tombstones].map((item) => item.guid));
 			const inserted: string[] = [];
 			for (const item of parsedItems) {
 				// The parser already uses the link as GUID only when no explicit ID exists.

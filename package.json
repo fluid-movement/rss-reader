@@ -20,9 +20,9 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"db:push": "drizzle-kit push",
+		"db:push": "node -e \"console.error('db:push is disabled: it would drop the items_fts search tables. Use pnpm db:generate and let the app apply migrations at boot.');process.exit(1)\"",
 		"db:generate": "drizzle-kit generate",
-		"db:migrate": "drizzle-kit migrate",
+		"db:migrate": "node -e \"console.error('db:migrate is disabled: migrations need the item_search_text SQL function that only the app connection registers. Start the app or run pnpm user:create / pnpm db:seed to migrate.');process.exit(1)\"",
 		"db:studio": "drizzle-kit studio",
 		"auth:schema": "auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
 	},

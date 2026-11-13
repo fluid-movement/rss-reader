@@ -8,10 +8,14 @@ import type { ReaderView } from '#lib/reader.ts';
  * never re-runs it; mutations and sync refresh it through the `app:list` key.
  */
 export function listLoader(view: ReaderView) {
-	return ({ locals, params, depends }: ServerLoadEvent) => {
+	return ({ locals, params, url, depends }: ServerLoadEvent) => {
 		if (!locals.user) redirect(303, '/login');
 		depends('app:list');
-		return getReaderData(db, locals.user.id, { view, id: params.id });
+		return getReaderData(db, locals.user.id, {
+			view,
+			id: params.id,
+			query: view === 'search' ? (url.searchParams.get('q') ?? '') : undefined
+		});
 	};
 }
 

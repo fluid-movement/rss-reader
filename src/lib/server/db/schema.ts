@@ -1,4 +1,11 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {
+	index,
+	integer,
+	primaryKey,
+	sqliteTable,
+	text,
+	uniqueIndex
+} from 'drizzle-orm/sqlite-core';
 import { user } from './auth.schema';
 
 const id = () =>
@@ -70,6 +77,24 @@ export const items = sqliteTable(
 		uniqueIndex('items_feed_guid_unique').on(table.feedId, table.guid),
 		index('items_feed_published_idx').on(table.feedId, table.publishedAt)
 	]
+);
+
+/**
+ * Minimal tombstones for items removed by retention pruning. Without them a pruned item that is
+ * still listed in its feed would be re-ingested as a new unread item on the next refresh.
+ */
+export const prunedItems = sqliteTable(
+	'pruned_items',
+	{
+		feedId: text('feed_id')
+			.notNull()
+			.references(() => feeds.id, { onDelete: 'cascade' }),
+		guid: text('guid').notNull(),
+		prunedAt: timestamp('pruned_at')
+			.notNull()
+			.$defaultFn(() => new Date())
+	},
+	(table) => [primaryKey({ columns: [table.feedId, table.guid] })]
 );
 
 export const itemState = sqliteTable(

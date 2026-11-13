@@ -57,6 +57,14 @@ Defaults: refresh every 60 minutes, full-text extraction off, retention 30 days,
 
 After changing auth plugins run `pnpm auth:schema`, then `pnpm db:generate`. Check the generated SQL and metadata into source control. Do not use `db:push` for deployments. `src/hooks.server.ts` applies pending migrations once at server startup, except during builds. Deploy the `drizzle/` directory with the application and run from the application root. The console command also applies migrations, so it works against an empty database.
 
+## Database tooling
+
+Full-text search (`items_fts`, an FTS5 virtual table) is kept in sync by triggers that call SQL functions registered by `connectDatabase()` (`src/lib/server/db/connect.ts`). Consequences:
+
+- Supported ways to migrate: app boot (`src/hooks.server.ts`), `pnpm user:create` and `pnpm db:seed`. All use `connectDatabase`.
+- `pnpm db:migrate` (drizzle-kit) and `pnpm db:push` are disabled and print a refusal. drizzle-kit does not register those functions, so migrating a database that already has items fails, and `push` would try to drop the FTS shadow tables. Drizzle Studio and the raw `sqlite3` shell cannot write items for the same reason (`no such function`). `pnpm db:generate` remains fine; use `pnpm drizzle-kit generate --custom` for hand-written SQL.
+- Retention pruning (daily, per `user_settings.retention_days`) deletes only read, unstarred items. Lowering the setting later cannot restore items that were already pruned. Each pruned item leaves a tiny tombstone (feed id and guid in `pruned_items`, removed with its feed) so it is not re-ingested as a new unread item.
+
 ## Checks
 
 ```sh

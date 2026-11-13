@@ -4,7 +4,7 @@
 	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { ModeWatcher } from 'mode-watcher';
-	import { Menu } from '@lucide/svelte';
+	import { Menu, Search } from '@lucide/svelte';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import * as Sheet from '#lib/components/ui/sheet/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -73,6 +73,13 @@
 				</Sheet.Content>
 			</Sheet.Root>
 			<a href={resolve('/(app)/(all)')} class="font-semibold tracking-tight">RSS Reader</a>
+			<Button
+				href={resolve('/(app)/search')}
+				variant="ghost"
+				size="icon"
+				class="ml-auto"
+				aria-label="Search articles"><Search /></Button
+			>
 		</header>
 		<main id="main-content" class="min-h-0 min-w-0 flex-1">{@render children()}</main>
 	</div>

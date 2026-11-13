@@ -1,4 +1,4 @@
-export type ReaderView = 'all' | 'unread' | 'starred' | 'feed' | 'folder';
+export type ReaderView = 'all' | 'unread' | 'starred' | 'feed' | 'folder' | 'search';
 
 export interface ArticlePreview {
 	id: string;
@@ -11,6 +11,14 @@ export interface ArticlePreview {
 	sortAt: Date;
 	read: boolean;
 	starred: boolean;
+	/** Search results only: the title / a body excerpt with matched terms flagged (plain text). */
+	titleParts?: HighlightSegment[];
+	snippetParts?: HighlightSegment[];
+}
+
+export interface HighlightSegment {
+	text: string;
+	match: boolean;
 }
 
 /** Position in a view's newest-first ordering; the next page starts after it. */
@@ -34,6 +42,8 @@ export interface ReaderData {
 	viewTitle: string;
 	listPath: string;
 	viewId: string | null;
+	/** Search view only: the (normalized) query. */
+	query: string | null;
 	/** First page only; see getArticlePage for continuation. */
 	articles: ArticlePreview[];
 	hasMore: boolean;

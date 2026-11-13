@@ -19,7 +19,10 @@
 
 	afterNavigate(({ from, type }) => {
 		// Only when the previous history entry is known to be this view's list.
-		cameFromList = (type === 'link' || type === 'goto') && !!from && from.url.pathname === backHref;
+		cameFromList =
+			(type === 'link' || type === 'goto') &&
+			!!from &&
+			from.url.pathname + from.url.search === backHref;
 	});
 
 	// Opening an article in the reader marks it read once; scrolling the list never does.

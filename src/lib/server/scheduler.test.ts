@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { connectDatabase } from './db/connect';
 import { migrateDatabase } from './db/migrate';
-import { feeds, items, user } from './db/schema';
+import { feeds, items, itemState, user } from './db/schema';
 import { createScheduler } from './scheduler';
 import { FeedFetchError, safeFetch, type SafeFetchResult } from './feeds/fetch';
 import { FeedParseError } from './feeds/parse';
@@ -71,7 +71,8 @@ describe('refresh scheduler', () => {
 		scheduler.start();
 		scheduler.start();
 		await scheduler.tick();
-		expect(vi.getTimerCount()).toBe(1);
+		// Feed tick interval, retention first-run timeout and daily retention interval.
+		expect(vi.getTimerCount()).toBe(3);
 		expect(info).toHaveBeenCalledExactlyOnceWith('Feed scheduler started (60-second interval).');
 		expect(safeFetch).toHaveBeenCalledTimes(1);
 		connection.db.update(feeds).set({ nextFetchAt: null }).run();
@@ -80,6 +81,31 @@ describe('refresh scheduler', () => {
 		await scheduler.stop();
 		await vi.advanceTimersByTimeAsync(60_000);
 		expect(safeFetch).toHaveBeenCalledTimes(2);
+	});
+	it('prunes shortly after start and then daily, and stops with the scheduler', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => {});
+		const old = new Date(now.getTime() - 60 * 86_400_000);
+		add('f', { nextFetchAt: new Date(now.getTime() + 10 * 86_400_000) });
+		const seed = (id: string) => {
+			connection.db
+				.insert(items)
+				.values({ id, feedId: 'f', guid: id, title: id, publishedAt: old })
+				.run();
+			connection.db.insert(itemState).values({ userId: 'owner', itemId: id, readAt: old }).run();
+		};
+		seed('first');
+		scheduler.start();
+		await vi.advanceTimersByTimeAsync(119_000);
+		expect(connection.db.select().from(items).all()).toHaveLength(1);
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(connection.db.select().from(items).all()).toHaveLength(0);
+		seed('second');
+		await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+		expect(connection.db.select().from(items).all()).toHaveLength(0);
+		await scheduler.stop();
+		seed('third');
+		await vi.advanceTimersByTimeAsync(48 * 60 * 60_000);
+		expect(connection.db.select().from(items).all()).toHaveLength(1);
 	});
 	it('uses validators and accepts 304 without parsing or dropping cached validators/items', async () => {
 		add('one', {

@@ -4,7 +4,7 @@ import { assertViewOwned, getArticlePage, LIST_PAGE_SIZE } from '#lib/server/rea
 import type { ReaderView } from '#lib/reader.ts';
 import type { RequestHandler } from './$types';
 
-const VIEWS: ReaderView[] = ['all', 'unread', 'starred', 'feed', 'folder'];
+const VIEWS: ReaderView[] = ['all', 'unread', 'starred', 'feed', 'folder', 'search'];
 
 /**
  * Next page of a view's article list, continuing after a cursor. Read-only and always
@@ -16,6 +16,7 @@ export const GET: RequestHandler = ({ locals, url }) => {
 	if (!VIEWS.includes(view as ReaderView)) error(400, 'Invalid view.');
 	const id = url.searchParams.get('id') ?? undefined;
 	if ((view === 'feed' || view === 'folder') && !id) error(400, 'Missing view id.');
+	const query = view === 'search' ? (url.searchParams.get('q') ?? '') : undefined;
 	const rawSortAt = url.searchParams.get('afterSortAt');
 	const afterSortAt = Number(rawSortAt);
 	const afterId = url.searchParams.get('afterId') ?? '';
@@ -26,7 +27,7 @@ export const GET: RequestHandler = ({ locals, url }) => {
 	const page = getArticlePage(
 		db,
 		locals.user.id,
-		{ view: view as ReaderView, id },
+		{ view: view as ReaderView, id, query },
 		{ after: { sortAt: afterSortAt, id: afterId }, limit }
 	);
 	return json({

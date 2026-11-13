@@ -4,11 +4,14 @@ import { feeds } from './db/schema';
 import { extractNewItems } from './feeds/extract';
 import { FeedFetchError, safeFetch } from './feeds/fetch';
 import { FeedParseError, parseFeed } from './feeds/parse';
+import { runRetentionJob } from './retention';
 import { createFeedService, FeedValidationError } from './feeds/subscribe';
 
 const MINUTE = 60_000;
 const MAX_BACKOFF = 4 * 60 * MINUTE;
 const MANUAL_COOLDOWN = 30_000;
+const RETENTION_INTERVAL = 24 * 60 * MINUTE;
+const RETENTION_FIRST_RUN = 2 * MINUTE;
 
 export type RefreshResult =
 	{ status: 'refreshed' | 'failed' } | { status: 'skipped'; reason: 'recent' };
@@ -30,6 +33,9 @@ export function createScheduler(db: AppDatabase) {
 	let active = 0;
 	let timer: ReturnType<typeof setInterval> | undefined;
 	let ticking: Promise<void> | undefined;
+	let retentionTimer: ReturnType<typeof setInterval> | undefined;
+	let retentionFirst: ReturnType<typeof setTimeout> | undefined;
+	let pruning: Promise<unknown> | undefined;
 	function drain() {
 		while (active < 4 && queue.length) queue.shift()!();
 	}
@@ -178,6 +184,14 @@ export function createScheduler(db: AppDatabase) {
 		return ticking;
 	}
 
+	/** Daily retention pruning; overlapping runs share one promise. runRetentionJob never throws. */
+	function prune() {
+		pruning ??= runRetentionJob(db).finally(() => {
+			pruning = undefined;
+		});
+		return pruning;
+	}
+
 	function start() {
 		if (timer) return;
 		console.info('Feed scheduler started (60-second interval).');
@@ -186,6 +200,11 @@ export function createScheduler(db: AppDatabase) {
 		};
 		timer = setInterval(run, MINUTE);
 		timer.unref?.();
+		// First prune shortly after boot (so restarts do not delay it by a day), then daily.
+		retentionFirst = setTimeout(() => void prune(), RETENTION_FIRST_RUN);
+		retentionTimer = setInterval(() => void prune(), RETENTION_INTERVAL);
+		retentionFirst.unref?.();
+		retentionTimer.unref?.();
 		run();
 	}
 
@@ -193,16 +212,24 @@ export function createScheduler(db: AppDatabase) {
 	async function stop() {
 		clearInterval(timer);
 		timer = undefined;
+		clearInterval(retentionTimer);
+		clearTimeout(retentionFirst);
+		retentionTimer = retentionFirst = undefined;
 		// Extraction is best effort: cancel it and never let it delay shutdown.
 		stopping.abort();
-		await Promise.allSettled([...running.values(), ...extractions, ...(ticking ? [ticking] : [])]);
+		await Promise.allSettled([
+			...running.values(),
+			...extractions,
+			...(ticking ? [ticking] : []),
+			...(pruning ? [pruning] : [])
+		]);
 		stopping = new AbortController();
 	}
 	/** Resolves when background full-text extraction has finished (used by tests). */
 	async function extractionsSettled() {
 		await Promise.allSettled([...extractions]);
 	}
-	return { refreshFeed, refreshAll, tick, start, stop, extractionsSettled };
+	return { refreshFeed, refreshAll, tick, prune, start, stop, extractionsSettled };
 }
 
 // Keep both the timer and its overlap locks across development module reloads.

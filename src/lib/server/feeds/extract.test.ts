@@ -14,6 +14,7 @@ import {
 	resetExtractionCooldowns
 } from './extract';
 import { FeedFetchError, safeFetch } from './fetch';
+import { getArticlePage } from '../reader';
 
 vi.mock('./fetch', async (importOriginal) => ({
 	...(await importOriginal<typeof import('./fetch')>()),
@@ -111,6 +112,18 @@ describe('extractItem / extractNewItems', () => {
 		await extractItem(connection.db, 'a');
 		expect(row('a').fullContent).toContain('first paragraph');
 		expect(row('a').content).toBe('<p>feed</p>');
+	});
+	it('re-indexes search when extraction writes full_content', async () => {
+		item('a');
+		const find = (query: string) =>
+			getArticlePage(connection.db, 'u', { view: 'search', query }).articles.map((a) => a.id);
+		expect(find('paragraph')).toEqual([]);
+		expect(find('feed')).toEqual(['a']);
+		await extractItem(connection.db, 'a');
+		expect(find('paragraph')).toEqual(['a']);
+		// Feed content stays searchable, and extracted markup is not indexed as words.
+		expect(find('feed')).toEqual(['a']);
+		expect(find('href')).toEqual([]);
 	});
 	it('keeps the feed content on failure', async () => {
 		item('a');

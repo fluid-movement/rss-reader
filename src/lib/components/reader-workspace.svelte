@@ -3,17 +3,18 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { BookOpen, Rss, Star, Circle, CheckCheck } from '@lucide/svelte';
+	import { BookOpen, Rss, Search, Star, Circle, CheckCheck } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { ScrollArea } from '#lib/components/ui/scroll-area/index.js';
+	import SearchBox from '#lib/components/search-box.svelte';
 	import { itemHref } from '#lib/reader-paths.ts';
 	import { EXTRA_PAGE_SIZE, loadChunked, withOpenArticle } from '#lib/reader-list.ts';
 	import { isRead, isStarred, markViewRead } from '#lib/reader-state.svelte.ts';
-	import type { ArticlePreview, ReaderData, ReaderItem } from '#lib/reader.ts';
+	import type { ArticlePreview, HighlightSegment, ReaderData, ReaderItem } from '#lib/reader.ts';
 	let {
 		data,
 		children
@@ -48,6 +49,7 @@
 		query.searchParams.set('afterId', after.id);
 		query.searchParams.set('limit', String(limit));
 		if (data.viewId) query.searchParams.set('id', data.viewId);
+		if (data.view === 'search') query.searchParams.set('q', data.query ?? '');
 		const response = await fetch(query);
 		if (!response.ok) throw new Error(`Request failed (${response.status})`);
 		const body = (await response.json()) as { articles: WireArticle[]; hasMore: boolean };
@@ -123,8 +125,21 @@
 	}
 </script>
 
+{#snippet parts(segments: HighlightSegment[])}
+	<!-- Plain text segments, escaped by Svelte; <mark> only wraps matched terms. -->
+	<!-- One wrapper element: the title and description containers are flex boxes with a gap. -->
+	<span
+		>{#each segments as segment, index (index)}{#if segment.match}<mark
+					class="rounded-sm bg-yellow-200 text-foreground dark:bg-yellow-500/40"
+					>{segment.text}</mark
+				>{:else}{segment.text}{/if}{/each}</span
+	>
+{/snippet}
+
 <svelte:head
-	>{#if !itemId}<title>{data.viewTitle} · RSS Reader</title>{/if}</svelte:head
+	>{#if !itemId}<title
+			>{data.view === 'search' && data.query ? `Search: ${data.query}` : data.viewTitle} · RSS Reader</title
+		>{/if}</svelte:head
 >
 
 <!-- Both panes render once; CSS picks which is visible so SSR/first paint match the viewport.
@@ -138,26 +153,31 @@
 	>
 		<section aria-label={data.viewTitle} class="flex h-full min-w-0 flex-col">
 			<header class="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-5">
-				<h1 class="truncate text-lg font-semibold tracking-tight">{data.viewTitle}</h1>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger
-						>{#snippet child({ props })}<Button
-								{...props}
-								variant="ghost"
-								size="sm"
-								disabled={unreadInView === 0}
-								aria-label="Mark as read options"
-								><CheckCheck data-icon="inline-start" />Mark read</Button
-							>{/snippet}</DropdownMenu.Trigger
-					>
-					<DropdownMenu.Content align="end">
-						<DropdownMenu.Item onSelect={() => markAll()}>Mark all as read</DropdownMenu.Item>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Item onSelect={() => markAll(1)}>Older than 1 day</DropdownMenu.Item>
-						<DropdownMenu.Item onSelect={() => markAll(7)}>Older than 1 week</DropdownMenu.Item>
-						<DropdownMenu.Item onSelect={() => markAll(30)}>Older than 1 month</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+				{#if data.view === 'search'}
+					<h1 class="sr-only">{data.viewTitle}</h1>
+					<SearchBox value={data.query ?? ''} autofocus={!data.query} class="min-w-0 flex-1" />
+				{:else}
+					<h1 class="truncate text-lg font-semibold tracking-tight">{data.viewTitle}</h1>
+				{/if}
+				{#if data.view !== 'search'}<DropdownMenu.Root>
+						<DropdownMenu.Trigger
+							>{#snippet child({ props })}<Button
+									{...props}
+									variant="ghost"
+									size="sm"
+									disabled={unreadInView === 0}
+									aria-label="Mark as read options"
+									><CheckCheck data-icon="inline-start" />Mark read</Button
+								>{/snippet}</DropdownMenu.Trigger
+						>
+						<DropdownMenu.Content align="end">
+							<DropdownMenu.Item onSelect={() => markAll()}>Mark all as read</DropdownMenu.Item>
+							<DropdownMenu.Separator />
+							<DropdownMenu.Item onSelect={() => markAll(1)}>Older than 1 day</DropdownMenu.Item>
+							<DropdownMenu.Item onSelect={() => markAll(7)}>Older than 1 week</DropdownMenu.Item>
+							<DropdownMenu.Item onSelect={() => markAll(30)}>Older than 1 month</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>{/if}
 			</header>
 			<ScrollArea class="min-h-0 flex-1">
 				{#if articles.length}
@@ -201,9 +221,13 @@
 											<Item.Title
 												class={read ? 'font-normal text-muted-foreground' : 'font-semibold'}
 											>
-												{article.title}
+												{#if article.titleParts}{@render parts(
+														article.titleParts
+													)}{:else}{article.title}{/if}
 											</Item.Title>
-											{#if article.summary}<Item.Description>
+											{#if article.snippetParts}<Item.Description>
+													{@render parts(article.snippetParts)}
+												</Item.Description>{:else if article.summary}<Item.Description>
 													{article.summary}
 												</Item.Description>{/if}
 										</Item.Content>
@@ -220,6 +244,18 @@
 							>
 						</div>
 					{/if}
+				{:else if data.view === 'search'}
+					<Empty.Root class="py-16"
+						><Empty.Header
+							><Empty.Media variant="icon"><Search /></Empty.Media><Empty.Title
+								>{data.query ? 'No results' : 'Search your articles'}</Empty.Title
+							><Empty.Description
+								>{data.query
+									? `Nothing matched “${data.query}”. Try different or fewer words.`
+									: 'Type a word or phrase to search titles and article text.'}</Empty.Description
+							></Empty.Header
+						></Empty.Root
+					>
 				{:else}
 					<Empty.Root class="py-16"
 						><Empty.Header

@@ -6,6 +6,7 @@
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import SearchBox from '#lib/components/search-box.svelte';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import type { ShellData } from '#lib/reader.ts';
 	import { unreadDelta } from '#lib/reader-state.svelte.ts';
@@ -98,6 +99,9 @@
 			class="flex items-center gap-2 text-base font-semibold tracking-tight"
 			><Rss class="size-5" /> RSS Reader</a
 		>
+		<SearchBox
+			value={page.url.pathname.startsWith('/search') ? (page.url.searchParams.get('q') ?? '') : ''}
+		/>
 		<form
 			method="POST"
 			action={`${resolve('/(app)/feeds')}?/refreshAll`}

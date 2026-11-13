@@ -9,6 +9,7 @@ import type {
 } from '#lib/reader.ts';
 import type { AppDatabase } from './db/connect';
 import { feeds, folders, items, itemState } from './db/schema';
+import { buildMatch, getHighlights, normalizeQuery } from './search';
 import { articleSummary, sanitizeArticle, webUrl } from './reader-content';
 
 /** One grouped query: unread items per feed (folder and total sums are derived by callers). */
@@ -48,8 +49,15 @@ export function assertViewOwned(db: AppDatabase, userId: string, view: ReaderVie
 }
 
 /** Row filter for a view; always includes ownership through the feed. */
-export function viewScope(userId: string, view: ReaderView, id?: string) {
+export function viewScope(userId: string, view: ReaderView, id?: string, query?: string) {
+	const match = view === 'search' ? buildMatch(query) : null;
 	return and(
+		// Search: ownership still comes from the feeds filter below, never from the index.
+		view === 'search'
+			? match
+				? sql`items.rowid in (select rowid from items_fts where items_fts match ${match})`
+				: sql`0`
+			: undefined,
 		eq(feeds.userId, userId),
 		view === 'feed' ? eq(feeds.id, id ?? '') : undefined,
 		view === 'folder' ? eq(feeds.folderId, id ?? '') : undefined,
@@ -120,7 +128,7 @@ const preview = {
 export function getArticlePage(
 	db: AppDatabase,
 	userId: string,
-	selection: { view: ReaderView; id?: string },
+	selection: { view: ReaderView; id?: string; query?: string },
 	options: { after?: ArticleCursor; limit?: number } = {}
 ): { articles: ArticlePreview[]; hasMore: boolean } {
 	const limit = Math.min(Math.max(1, Math.floor(options.limit ?? LIST_PAGE_SIZE)), MAX_PAGE_SIZE);
@@ -132,7 +140,7 @@ export function getArticlePage(
 		.leftJoin(itemState, stateJoin(userId))
 		.where(
 			and(
-				viewScope(userId, selection.view, selection.id),
+				viewScope(userId, selection.view, selection.id, selection.query),
 				after
 					? or(
 							sql`${sortExpr} < ${after.sortAt}`,
@@ -144,10 +152,29 @@ export function getArticlePage(
 		.orderBy(desc(sortExpr), asc(items.id))
 		.limit(limit + 1)
 		.all();
+	const pageRows = rows.slice(0, limit);
+	const match = selection.view === 'search' ? buildMatch(selection.query) : null;
+	const highlights = match
+		? getHighlights(
+				db,
+				match,
+				pageRows.map((row) => row.id)
+			)
+		: undefined;
 	return {
-		articles: rows
-			.slice(0, limit)
-			.map((article) => ({ ...article, summary: articleSummary(article.summary) })),
+		articles: pageRows.map((article) => {
+			const found = highlights?.get(article.id);
+			return {
+				...article,
+				summary: articleSummary(article.summary),
+				...(found
+					? {
+							titleParts: found.title,
+							snippetParts: found.snippet.length ? found.snippet : undefined
+						}
+					: {})
+			};
+		}),
 		hasMore: rows.length > limit
 	};
 }
@@ -156,13 +183,15 @@ export function getArticlePage(
 export function getReaderData(
 	db: AppDatabase,
 	userId: string,
-	selection: { view: ReaderView; id?: string }
+	selection: { view: ReaderView; id?: string; query?: string }
 ): ReaderData {
 	const { view, id } = selection;
+	const query = view === 'search' ? normalizeQuery(selection.query) : null;
 	let viewTitle = {
 		all: 'All articles',
 		unread: 'Unread',
 		starred: 'Starred',
+		search: 'Search',
 		feed: '',
 		folder: ''
 	}[view];
@@ -172,8 +201,14 @@ export function getReaderData(
 		view,
 		viewTitle,
 		viewId: id ?? null,
-		listPath: view === 'all' ? '/' : `/${view}${id ? `/${encodeURIComponent(id)}` : ''}`,
-		...getArticlePage(db, userId, selection),
+		query,
+		listPath:
+			view === 'all'
+				? '/'
+				: view === 'search'
+					? `/search?q=${encodeURIComponent(query ?? '')}`
+					: `/${view}${id ? `/${encodeURIComponent(id)}` : ''}`,
+		...getArticlePage(db, userId, { ...selection, query: query ?? undefined }),
 		hasFeeds: !!db
 			.select({ id: feeds.id })
 			.from(feeds)
@@ -195,7 +230,7 @@ export function getSelectedItem(
 	const { view, id, itemId } = selection;
 	assertViewOwned(db, userId, view, id);
 	const scope =
-		view === 'unread' || view === 'starred'
+		view === 'unread' || view === 'starred' || view === 'search'
 			? eq(feeds.userId, userId)
 			: viewScope(userId, view, id);
 	const item = db
