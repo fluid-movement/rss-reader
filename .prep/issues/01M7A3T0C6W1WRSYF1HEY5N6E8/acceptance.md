@@ -1,0 +1,2 @@
+- [ ] j/k, m, s, o, r, /, ? shortcuts work and do not fire while typing in inputs
+- [ ] Settings page edits per-feed settings, reader preferences, retention and passkeys

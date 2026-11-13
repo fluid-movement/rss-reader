@@ -1,0 +1,4 @@
+- [ ] Docker image builds and runs with adapter-node
+- [ ] SQLite persists on a volume and migrations run on start
+- [ ] Env vars and first-user creation are documented
+- [ ] Health endpoint responds

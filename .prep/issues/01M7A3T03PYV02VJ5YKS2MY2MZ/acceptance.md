@@ -1,0 +1,4 @@
+- [ ] Timer starts with the server and refreshes due feeds using ETag/Last-Modified
+- [ ] Failing feeds back off and show last error
+- [ ] Manual refresh of one feed and of all works from the UI
+- [ ] Scheduler logic has tests

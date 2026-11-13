@@ -1,0 +1,3 @@
+- [ ] OPML import creates folders and feeds, skips duplicates and reports results
+- [ ] OPML export round-trips with import
+- [ ] Tests cover import and export

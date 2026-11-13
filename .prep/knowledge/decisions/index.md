@@ -1,0 +1,8 @@
+# decisions
+
+## Entries
+
+* [No public sign-up; users created via console; passkeys](/decisions/01M7A3TWQGX6E3JH8E286BHKZC.md) - There is no sign-up page or endpoint. Users are created only with a console command. Sign-in is email+password plus passkey (WebAuthn) via Better Auth. Reason: self-hosted, single-person app exposed publicly on Coolify.
+* [In-process refresh timer, manually triggerable](/decisions/01M7A3TWS2SA5QF150AFJ2P4Y8.md) - Feeds refresh from an in-process interval timer in the server, plus manual refresh of one feed or all. No external cron. Reason: single Coolify container, simplest option.
+* [No offline support or extra integrations in v1](/decisions/01M7A3TWTQQKX8ZNA17MF254CV.md) - v1 is an online-only PWA (installable, app shell cached, data fetched live). No offline article caching, Fever/Google Reader API, push notifications or in-app social sharing. Only a share-link button for article URLs. Reason: keep it simple; offline can be v2.
+* [Three-pane layout, Readability extraction, FTS5 search](/decisions/01M7A3TWWCRKT1SNF96RKW8212.md) - Desktop is three panes (sidebar/list/reader), mobile stacked. Full-text extraction uses Readability. Search uses SQLite FTS5. UI uses shadcn-svelte components only.
