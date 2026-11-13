@@ -1,3 +1,3 @@
-- [ ] A feed with error_count >= 3 shows a warning indicator in the sidebar with the safe last_error text available on hover or focus, and it is accessible (not color alone)
-- [ ] The failing feed's own view shows the last error and a working Retry (refresh) button; a feed that is healthy shows neither
-- [ ] Verified in a real browser on desktop and phone with the dead kottke.org feed from the seed; no layout regressions; pnpm check and pnpm test pass
+- [x] A feed with error_count >= 3 shows a warning indicator in the sidebar with the safe last_error text available on hover or focus, and it is accessible (not color alone)
+- [x] The failing feed's own view shows the last error and a working Retry (refresh) button; a feed that is healthy shows neither
+- [x] Verified in a real browser on desktop and phone with the dead kottke.org feed from the seed; no layout regressions; pnpm check and pnpm test pass
