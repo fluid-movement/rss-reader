@@ -77,6 +77,34 @@ pnpm test
 
 Tests use isolated in-memory SQLite databases and the actual generated migrations.
 
+## Mobile tests
+
+Touch-emulated Playwright tests (`e2e/*.spec.ts`, kept apart from the vitest files) cover the phone flows: navigation drawer, list to article and back with scroll kept, article swipes (including the edge and horizontal-scroll exclusions), row swipes with Undo, pull to refresh, and no horizontal overflow with safe-area insets at 360, 390 and 430 px. They run on an iPhone 14 and a Pixel 7 profile (`hasTouch`, `isMobile`), always in Chromium, because gestures are sent through CDP `Input.dispatchTouchEvent` so pointer and touch events fire as on a device.
+
+```sh
+pnpm install
+pnpm exec playwright install chromium   # once per machine; browsers are never committed
+pnpm test:mobile
+```
+
+Everything is offline. Playwright builds the app and serves it on port 4399 (override with `E2E_PORT`) against a private, freshly seeded database in `.e2e/` (git-ignored), with a fixed fixture user and 40 articles inserted through the feed service. The fixture seed reuses the dev seed guard (local `ORIGIN`, database inside the project) and never touches `local.db` or the network; the refresh request of the pull-to-refresh test is answered locally. Screenshots of the list, drawer and article at each width are attached to each test run (`.e2e/results` when a test fails).
+
+### Real-device checklist
+
+Emulation cannot reproduce browser chrome, system gestures or the keyboard. Before a release that touches mobile behavior, check on real hardware: iOS Safari, the installed iOS PWA (Share, Add to Home Screen), Android Chrome and the installed Android PWA (install prompt or menu).
+
+For each of the four:
+
+- [ ] Install flow: iOS Share, Add to Home Screen; Android the install prompt or menu. Name, icon and splash look right, and it opens standalone.
+- [ ] Status bar and safe areas: nothing sits under the notch, status bar or home indicator, in portrait and landscape. The article action bar clears the home indicator. The theme color matches the header.
+- [ ] Edge-swipe behavior: the system back gesture (iOS left edge, Android edge or gesture bar) navigates back and is never hijacked. Swiping the article left or right pages between articles only away from the screen edges, and not inside code blocks or tables that scroll sideways.
+- [ ] Row gestures: swipe right marks read, swipe left stars, Undo works, a long press opens the row menu. A vertical scroll never triggers a swipe.
+- [ ] Pull to refresh: pulling down at the top of the list refreshes once; the page itself never reloads (check the installed PWA especially).
+- [ ] Drawer and back: the menu opens and closes by tap and Back; returning from an article restores the list scroll position.
+- [ ] Keyboard: focusing the search box raises the keyboard without covering the field, the layout does not jump or zoom, and dismissing it restores the layout.
+- [ ] Share sheet: Share on an article opens the native sheet (and copies the link where Web Share is missing).
+- [ ] Text: increasing the system text size keeps every control reachable with no horizontal scrolling.
+
 ## Coolify deployment
 
 Deploy this repository with Coolify's **Dockerfile** build pack, using the root `Dockerfile` and container port **3000**. Set the public domain to an HTTPS URL and configure these **runtime** environment variables (no build secrets are needed):

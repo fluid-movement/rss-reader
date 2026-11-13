@@ -26,3 +26,6 @@ vite.config.ts.timestamp-*
 *.db-shm
 *.db-wal
 .claude/worktrees/
+
+# Playwright mobile tests
+/.e2e/

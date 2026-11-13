@@ -11,6 +11,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"test": "vitest run",
+		"test:mobile": "playwright test",
 		"user:create": "tsx --env-file-if-exists=.env scripts/create-user.ts",
 		"db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
 		"build": "vite build",
@@ -31,6 +32,7 @@
 		"@fontsource-variable/geist": "^5.3.0",
 		"@internationalized/date": "^3.12.4",
 		"@lucide/svelte": "^1.72.0",
+		"@playwright/test": "^1.65.0",
 		"@sveltejs/adapter-node": "^6.0.2",
 		"@sveltejs/kit": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",
