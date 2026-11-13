@@ -108,7 +108,7 @@
 		<div class="action-slot">
 			<div
 				data-reader-actions
-				class="reader-actions flex flex-wrap items-center gap-1 [&_a]:min-h-11 [&_button]:min-h-11"
+				class="reader-actions flex flex-wrap items-center gap-1 max-lg:gap-2 [&_a]:min-h-11 [&_button]:min-h-11"
 				data-collapsed={collapsed && !headerFocused}
 				inert={collapsed && !headerFocused}
 			>

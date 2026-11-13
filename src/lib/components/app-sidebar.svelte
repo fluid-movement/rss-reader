@@ -190,7 +190,7 @@
 							{@const open = routeActive || !collapsedFolders.includes(folder.id)}
 							<Sidebar.MenuItem>
 								<Collapsible.Root {open} onOpenChange={(value) => setFolderOpen(folder.id, value)}>
-									<div class="flex min-w-0 items-center">
+									<div class="flex min-w-0 items-center max-lg:gap-2">
 										<Sidebar.MenuButton isActive={active(href)} class="min-w-0 flex-1"
 											>{#snippet child({ props })}<a
 													{...props}

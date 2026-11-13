@@ -6,6 +6,11 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+	/* Aliases also let browser tests emulate devices with a notch/home indicator. */
+	--sat: env(safe-area-inset-top, 0px);
+	--sar: env(safe-area-inset-right, 0px);
+	--sab: env(safe-area-inset-bottom, 0px);
+	--sal: env(safe-area-inset-left, 0px);
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.145 0 0);
 	--card: oklch(1 0 0);
@@ -125,5 +130,148 @@
 	}
 	html {
 		@apply font-sans;
+	}
+}
+
+@media (pointer: coarse), (display-mode: standalone) {
+	/* Stop native refresh/history overscroll and chaining, not normal scrolling or
+     OS edge navigation. Future gestures must still reject edge starts. */
+	html,
+	body,
+	[data-slot='scroll-area-viewport'],
+	[data-slot='sidebar-content'],
+	.overflow-y-auto,
+	.overflow-x-auto,
+	[role='dialog'],
+	[role='menu'],
+	.article-prose pre,
+	.article-prose table {
+		overscroll-behavior: none;
+	}
+}
+
+@media (max-width: 1023px) {
+	.app-header {
+		height: calc(3.5rem + var(--sat));
+		padding-top: var(--sat);
+		padding-left: max(0.75rem, var(--sal));
+		padding-right: max(0.75rem, var(--sar));
+	}
+
+	/* The shell owns the insets once: both list and reader inherit the same
+	   usable space. dvh tracks browser chrome; login uses svh to avoid jumps. */
+	#main-content {
+		padding: 0 var(--sar) var(--sab) var(--sal);
+	}
+
+	.navigation-drawer {
+		background-color: var(--sidebar);
+		height: 100dvh;
+		padding: var(--sat) var(--sar) var(--sab) var(--sal);
+	}
+
+	.navigation-drawer [data-slot='sheet-close'] {
+		top: calc(var(--sat) + 0.75rem);
+		right: calc(var(--sar) + 0.75rem);
+	}
+
+	.navigation-drawer [data-slot='sidebar-header'] {
+		gap: 0.5rem;
+	}
+
+	.navigation-drawer [data-slot='sidebar-header'] > a {
+		margin-right: 3rem;
+	}
+
+	main.min-h-svh {
+		padding: max(1.5rem, var(--sat)) max(1.5rem, var(--sar)) max(1.5rem, var(--sab))
+			max(1.5rem, var(--sal));
+	}
+
+	[data-slot='dialog-content'],
+	[data-slot='alert-dialog-content'] {
+		max-height: calc(100dvh - var(--sat) - var(--sab) - 2rem);
+		max-width: calc(100vw - var(--sal) - var(--sar) - 2rem);
+		overflow-y: auto;
+	}
+
+	/* Style the installed shadcn components through their public slots instead
+	   of forking their internals. Decorative row icons are not separate targets. */
+	:where(
+			a,
+			button,
+			input:not([type='hidden']),
+			select,
+			textarea,
+			[role='button'],
+			[role='tab'],
+			[role^='menuitem']
+		):not([role='switch']):not([role='checkbox']):not(.article-prose *) {
+		min-width: 44px;
+		min-height: 44px;
+	}
+
+	/* Links inside running text stay inline so paragraphs keep their line flow. */
+	a:not([data-slot]):not(.article-prose *):not(:is(p, [data-slot*='description']) a) {
+		display: inline-flex;
+		align-items: center;
+	}
+
+	input:not([type='hidden']),
+	select,
+	textarea {
+		font-size: 16px;
+	}
+
+	:where(
+		button,
+		[role='button'],
+		[role='tab'],
+		[role^='menuitem'],
+		[data-slot='item'],
+		[data-sidebar='menu-button'],
+		[data-sidebar='menu-sub-button']
+	) {
+		-webkit-tap-highlight-color: color-mix(in srgb, var(--primary) 15%, transparent);
+		-webkit-user-select: none;
+		user-select: none;
+	}
+
+	/* Preserve the compact switch/checkbox appearance, expand only its hit box. */
+	:where([role='switch'], [role='checkbox']) {
+		position: relative;
+		margin: 6px;
+	}
+	:where([role='switch'], [role='checkbox'])::after {
+		content: '';
+		position: absolute;
+		width: max(100%, 44px);
+		height: 44px;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+	}
+	div:has(> [role='switch']),
+	div:has(> [role='checkbox']) {
+		min-height: 44px;
+	}
+
+	[data-slot='sidebar-menu'],
+	[data-slot='sidebar-menu-sub'] {
+		gap: 8px;
+	}
+	[data-slot='sidebar-menu-sub'] {
+		margin-block: 8px;
+	}
+	[data-slot='tabs-list'] {
+		height: auto;
+		gap: 8px;
+	}
+	[role^='menuitem'] + [role^='menuitem'] {
+		margin-top: 8px;
+	}
+	/* Touch users get the same affordances as hover users. */
+	[data-slot='sidebar-menu-action'] {
+		opacity: 1;
 	}
 }

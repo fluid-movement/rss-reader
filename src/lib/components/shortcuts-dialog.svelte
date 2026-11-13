@@ -17,7 +17,8 @@
 			onCloseAutoFocus?.();
 		}}
 	>
-		<Dialog.Header>
+		<!-- Phones: the 44px close button sits in the top-right corner, keep the text clear of it. -->
+		<Dialog.Header class="max-lg:pe-12">
 			<Dialog.Title>Keyboard shortcuts</Dialog.Title>
 			<Dialog.Description>
 				Available on any keyboard. They pause while you type in a field or have a dialog open.

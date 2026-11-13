@@ -20,6 +20,19 @@
 	}: { data: ShellData & { readerPrefs: { fontSize: number; width: number } }; children: Snippet } =
 		$props();
 	let helpOpen = $state(false);
+	// Toasts clear the notch, home indicator and landscape side insets (sonner's CSS offsets).
+	const toastOffset = {
+		top: 'calc(var(--sat) + 24px)',
+		right: 'max(24px, var(--sar))',
+		bottom: 'calc(var(--sab) + 24px)',
+		left: 'max(24px, var(--sal))'
+	};
+	const mobileToastOffset = {
+		top: 'calc(var(--sat) + 16px)',
+		right: 'max(16px, var(--sar))',
+		bottom: 'calc(var(--sab) + 16px)',
+		left: 'max(16px, var(--sal))'
+	};
 	// Both the persistent desktop sidebar and the mounted-on-demand phone drawer share this state.
 	let collapsedFolders = $derived(data.collapsedFolders);
 	const sidebarData = $derived({ ...data, collapsedFolders });
@@ -72,14 +85,14 @@
 <svelte:window {onkeydown} />
 <ModeWatcher defaultMode="system" />
 <ShortcutsDialog bind:open={helpOpen} onCloseAutoFocus={restoreFocus} />
-<Toaster richColors />
+<Toaster richColors offset={toastOffset} mobileOffset={mobileToastOffset} />
 <Sidebar.Provider class="h-dvh min-h-0 overflow-hidden">
 	<!-- Layout switches with CSS (not a media-query store) so SSR and first paint match the viewport. -->
 	<div class="flex size-full min-w-0 flex-col lg:flex-row">
 		<aside class="hidden h-full w-60 shrink-0 border-r min-[1150px]:w-72 lg:block">
 			<AppSidebar data={sidebarData} {onCollapsedChange} />
 		</aside>
-		<header class="flex h-14 shrink-0 items-center gap-3 border-b px-3 lg:hidden">
+		<header class="app-header flex h-14 shrink-0 items-center gap-3 border-b px-3 lg:hidden">
 			<Sheet.Root bind:open={navigationOpen}>
 				<Sheet.Trigger
 					>{#snippet child({ props })}<Button
@@ -89,7 +102,7 @@
 							aria-label="Open navigation"><Menu /></Button
 						>{/snippet}</Sheet.Trigger
 				>
-				<Sheet.Content side="left" class="w-72 gap-0 p-0">
+				<Sheet.Content side="left" class="navigation-drawer w-72 gap-0 p-0">
 					<Sheet.Header class="sr-only"
 						><Sheet.Title>Reader navigation</Sheet.Title><Sheet.Description
 							>Browse articles, feeds, and settings.</Sheet.Description

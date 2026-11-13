@@ -239,7 +239,7 @@
 								method="POST"
 								action="?/renameFolder"
 								use:enhance={submit}
-								class="min-w-0 flex-1"
+								class="min-w-0 flex-1 max-sm:w-full max-sm:flex-none"
 							>
 								<input type="hidden" name="folderId" value={folder.id} />
 								<Field.Group class="flex-row items-end gap-3">
