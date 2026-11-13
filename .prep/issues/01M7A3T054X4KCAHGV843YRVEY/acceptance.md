@@ -1,4 +1,4 @@
-- [ ] Three-pane desktop layout and stacked mobile layout built with shadcn-svelte components
-- [ ] Share button uses Web Share API with copy-link fallback
-- [ ] Dark mode works
-- [ ] Verified in browser at desktop and phone widths
+- [x] Three-pane desktop layout and stacked mobile layout built with shadcn-svelte components
+- [x] Share button uses Web Share API with copy-link fallback
+- [x] Dark mode works
+- [x] Verified in browser at desktop and phone widths
