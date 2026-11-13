@@ -85,11 +85,6 @@ export const actions: Actions = {
 		(id, data) => service.moveFeed(id, field(data, 'feedId'), field(data, 'folderId') || undefined),
 		'Feed moved.'
 	),
-	setExtractFullText: mutation(
-		(id, data) =>
-			service.setExtractFullText(id, field(data, 'feedId'), field(data, 'enabled') === 'true'),
-		'Full-text setting saved.'
-	),
 	createFolder: mutation(
 		(id, data) => service.createFolder(id, field(data, 'name')),
 		'Folder created.'

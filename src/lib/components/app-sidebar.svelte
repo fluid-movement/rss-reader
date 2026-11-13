@@ -207,12 +207,12 @@
 	<Sidebar.Footer class="gap-2 p-2">
 		<Sidebar.Menu>
 			<Sidebar.MenuItem
-				><Sidebar.MenuButton
-					>{#snippet child({
-						props
-					})}<!-- Settings (a later issue) has no route yet, so resolve() cannot type it. -->
-						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-						<a {...props} href="/settings"><Settings /><span>Settings</span></a
+				><Sidebar.MenuButton isActive={active('/settings')}
+					>{#snippet child({ props })}<a
+							{...props}
+							href={resolve('/(app)/settings')}
+							aria-current={active('/settings') ? 'page' : undefined}
+							><Settings /><span>Settings</span></a
 						>{/snippet}</Sidebar.MenuButton
 				></Sidebar.MenuItem
 			>

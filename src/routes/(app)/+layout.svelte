@@ -10,9 +10,27 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Toaster } from '#lib/components/ui/sonner/index.js';
 	import AppSidebar from '#lib/components/app-sidebar.svelte';
+	import ShortcutsDialog from '#lib/components/shortcuts-dialog.svelte';
+	import { createShortcutHandler } from '#lib/shortcut-handler.svelte.ts';
 	import { syncReaderData } from '#lib/reader-state.svelte.ts';
 	import type { ShellData } from '#lib/reader.ts';
-	let { data, children }: { data: ShellData; children: Snippet } = $props();
+	let {
+		data,
+		children
+	}: { data: ShellData & { readerPrefs: { fontSize: number; width: number } }; children: Snippet } =
+		$props();
+	let helpOpen = $state(false);
+	let returnFocusTo: HTMLElement | null = null;
+	const onkeydown = createShortcutHandler(() => {
+		const active = document.activeElement;
+		returnFocusTo = active instanceof HTMLElement && active !== document.body ? active : null;
+		helpOpen = true;
+	});
+	// After the help dialog closes, focus goes back to where it was, else the main region.
+	function restoreFocus() {
+		(returnFocusTo?.isConnected ? returnFocusTo : document.getElementById('main-content'))?.focus();
+		returnFocusTo = null;
+	}
 	let navigationOpen = $state(false);
 	afterNavigate(() => {
 		navigationOpen = false;
@@ -45,7 +63,9 @@
 	});
 </script>
 
+<svelte:window {onkeydown} />
 <ModeWatcher defaultMode="system" />
+<ShortcutsDialog bind:open={helpOpen} onCloseAutoFocus={restoreFocus} />
 <Toaster richColors />
 <Sidebar.Provider class="h-dvh min-h-0 overflow-hidden">
 	<!-- Layout switches with CSS (not a media-query store) so SSR and first paint match the viewport. -->
@@ -81,6 +101,15 @@
 				aria-label="Search articles"><Search /></Button
 			>
 		</header>
-		<main id="main-content" class="min-h-0 min-w-0 flex-1">{@render children()}</main>
+		<!-- Reader preferences as CSS variables: server-rendered, so there is no flash on first paint. -->
+		<main
+			id="main-content"
+			tabindex="-1"
+			class="min-h-0 min-w-0 flex-1 outline-none"
+			style="--reader-font-size: {data.readerPrefs.fontSize}px; --reader-width: {data.readerPrefs
+				.width}px;"
+		>
+			{@render children()}
+		</main>
 	</div>
 </Sidebar.Provider>

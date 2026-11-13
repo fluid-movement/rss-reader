@@ -125,6 +125,15 @@ describe('subscription and immediate ingestion', () => {
 	});
 });
 
+describe('folder name cleaning', () => {
+	it('strips control and bidi characters on create and rename', () => {
+		const folder = service.createFolder('owner', 'A ‮RTL\u0007ctrl');
+		expect(folder.name).toBe('A RTLctrl');
+		service.renameFolder('owner', folder.id, '⁦B‏  C');
+		expect(service.list('owner').folders[0].name).toBe('B C');
+	});
+});
+
 describe('user-scoped management', () => {
 	it('creates, renames, assigns, unassigns and deletes folders without deleting articles', async () => {
 		const folder = service.createFolder('owner', ' News ');

@@ -1,6 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/connect';
 import { feeds, folders, items, prunedItems } from '../db/schema';
+import { cleanSingleLine } from '../clean-text';
 import { discoverFeed } from './discover';
 import { normalizeFeedUrl } from './normalize-url';
 import { sanitizeContent, type ParsedItem } from './parse';
@@ -33,7 +34,7 @@ export function createFeedService(db: AppDatabase) {
 		return feed;
 	}
 	function folderName(value: string) {
-		const name = value.trim();
+		const name = cleanSingleLine(value);
 		if (!name || name.length > 200)
 			throw new FeedValidationError('Enter a folder name of 1–200 characters.');
 		return name;
@@ -163,13 +164,6 @@ export function createFeedService(db: AppDatabase) {
 		removeFeed(userId: string, feedId: string) {
 			requireFeed(userId, feedId);
 			db.delete(feeds)
-				.where(and(eq(feeds.id, feedId), eq(feeds.userId, userId)))
-				.run();
-		},
-		setExtractFullText(userId: string, feedId: string, enabled: boolean) {
-			requireFeed(userId, feedId);
-			db.update(feeds)
-				.set({ extractFullText: enabled })
 				.where(and(eq(feeds.id, feedId), eq(feeds.userId, userId)))
 				.run();
 		},

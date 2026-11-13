@@ -270,7 +270,10 @@ describe('OPML persistence and export', () => {
 			foldersCreated: 2
 		});
 		const imported = feeds.list('other');
-		expect(imported.folders.map((f) => f.name)).toEqual(expect.arrayContaining([title, 'Empty']));
+		// Folder names are one line: the newline becomes a space (feed titles keep theirs).
+		expect(imported.folders.map((f) => f.name)).toEqual(
+			expect.arrayContaining([title.replace('\n', ' '), 'Empty'])
+		);
 		expect(imported.feeds.find((f) => f.title === title)?.url).toBe(
 			'https://example.com/rss?a=1&b=2'
 		);

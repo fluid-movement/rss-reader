@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance, type SubmitFunction } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import OpmlPanel from '#lib/components/opml-panel.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -7,7 +8,6 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
-	import { Switch } from '#lib/components/ui/switch/index.js';
 	import * as NativeSelect from '#lib/components/ui/native-select/index.js';
 	import type { PageProps } from './$types';
 
@@ -44,7 +44,11 @@
 	<div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6" aria-busy={pending}>
 		<header class="flex flex-col gap-2">
 			<h1 class="text-2xl font-semibold tracking-tight">Manage feeds</h1>
-			<p class="text-muted-foreground">Subscribe to RSS feeds and organize them into folders.</p>
+			<p class="text-muted-foreground">
+				Subscribe to RSS feeds and organize them into folders. Custom titles, refresh intervals and
+				full-article fetching are in
+				<a href={resolve('/(app)/settings')} class="underline underline-offset-4">Settings</a>.
+			</p>
 		</header>
 
 		<div role="status" aria-live="polite">
@@ -195,36 +199,6 @@
 									>
 								</form>
 							</div>
-							<form
-								method="POST"
-								action="?/setExtractFullText"
-								use:enhance={submit}
-								class="flex min-w-0 items-start gap-3"
-							>
-								<input type="hidden" name="feedId" value={feed.id} />
-								<input type="hidden" name="enabled" value={String(!feed.extractFullText)} />
-								<Switch
-									id={`feed-fulltext-${feed.id}`}
-									class="mt-0.5"
-									checked={feed.extractFullText}
-									disabled={pending}
-									onCheckedChange={() => {
-										const input = document.getElementById(`feed-fulltext-${feed.id}`);
-										input?.closest('form')?.requestSubmit();
-									}}
-								/>
-								<div class="flex min-w-0 flex-col gap-0.5">
-									<Field.Label for={`feed-fulltext-${feed.id}`}
-										>Fetch full articles<span class="sr-only">
-											for {feed.title || feed.url}</span
-										></Field.Label
-									>
-									<p class="text-sm text-muted-foreground">
-										Extracts the first 10 new articles per refresh; use Load full article for
-										others.
-									</p>
-								</div>
-							</form>
 						</li>
 					{:else}
 						<li class="text-sm text-muted-foreground">

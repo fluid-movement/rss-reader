@@ -12,6 +12,7 @@
 	import { ScrollArea } from '#lib/components/ui/scroll-area/index.js';
 	import SearchBox from '#lib/components/search-box.svelte';
 	import { itemHref } from '#lib/reader-paths.ts';
+	import { setReaderShortcutContext } from '#lib/shortcut-handler.svelte.ts';
 	import { EXTRA_PAGE_SIZE, loadChunked, withOpenArticle } from '#lib/reader-list.ts';
 	import { isRead, isStarred, markViewRead } from '#lib/reader-state.svelte.ts';
 	import type { ArticlePreview, HighlightSegment, ReaderData, ReaderItem } from '#lib/reader.ts';
@@ -108,6 +109,33 @@
 		});
 	});
 
+	// Tell the shell's keyboard shortcuts what is listed and open (j/k, m, s, o, r).
+	$effect(() => {
+		setReaderShortcutContext({
+			view: data.view,
+			viewId: data.viewId,
+			articleIds: articles.map((article) => article.id),
+			selectedId: itemId,
+			selected: selectedItem ?? articles.find((article) => article.id === itemId),
+			hasMore,
+			loadMore: async () => {
+				await loadMore();
+				return articles.map((article) => article.id);
+			},
+			hrefFor: (id) => itemHref(data, id)
+		});
+		return () => setReaderShortcutContext(null);
+	});
+
+	// Keep the open row visible without moving the list otherwise (also for keyboard j/k).
+	let listElement = $state<HTMLElement | null>(null);
+	$effect(() => {
+		if (!itemId) return;
+		listElement
+			?.querySelector('[aria-current="page"]')
+			?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+	});
+
 	function dateLabel(date: Date) {
 		return new Intl.DateTimeFormat('en', {
 			month: 'short',
@@ -181,7 +209,7 @@
 			</header>
 			<ScrollArea class="min-h-0 flex-1">
 				{#if articles.length}
-					<Item.Group class="min-w-0 p-2">
+					<Item.Group class="min-w-0 p-2" bind:ref={listElement}>
 						{#each articles as article (article.id)}
 							{@const read = isRead(article)}
 							<Item.Root

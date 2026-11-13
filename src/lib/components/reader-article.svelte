@@ -7,6 +7,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { ScrollArea } from '#lib/components/ui/scroll-area/index.js';
 	import { shareArticle } from '#lib/share.ts';
+	import { safeOriginalLink } from '#lib/shortcuts.ts';
 	import { listHref } from '#lib/reader-paths.ts';
 	import { isRead, isStarred, updateArticle } from '#lib/reader-state.svelte.ts';
 	import type { ReaderItemData } from '#lib/reader.ts';
@@ -14,7 +15,7 @@
 	let sharing = $state(false);
 	let cameFromList = $state(false);
 	let selected = $derived(data.selectedItem);
-	let original = $derived(safeLink(selected.link));
+	let original = $derived(safeOriginalLink(selected.link));
 	let backHref = $derived(listHref(data));
 
 	afterNavigate(({ from, type }) => {
@@ -40,15 +41,6 @@
 		if (!cameFromList) return;
 		event.preventDefault();
 		history.back();
-	}
-	function safeLink(link: string | null | undefined) {
-		if (!link) return null;
-		try {
-			const url = new URL(link);
-			return ['https:', 'http:'].includes(url.protocol) ? url.href : null;
-		} catch {
-			return null;
-		}
 	}
 	function dateLabel(date: Date) {
 		return new Intl.DateTimeFormat('en', {
@@ -114,7 +106,7 @@
 	{#key selected.id}
 		<ScrollArea class="min-h-0 min-w-0 flex-1">
 			<article
-				class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-7 px-6 py-10 sm:px-10 lg:py-14"
+				class="mx-auto flex w-full max-w-[var(--reader-width,720px)] min-w-0 flex-col gap-7 px-6 py-10 sm:px-10 lg:py-14"
 			>
 				<header class="flex min-w-0 flex-col gap-4">
 					<p class="text-sm font-medium text-muted-foreground">{selected.feedTitle}</p>
@@ -147,7 +139,7 @@
 <style>
 	.article-prose {
 		min-width: 0;
-		font-size: 1rem;
+		font-size: var(--reader-font-size, 18px);
 		line-height: 1.85;
 		overflow-wrap: anywhere;
 	}
