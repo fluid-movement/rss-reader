@@ -1,3 +1,3 @@
-- [ ] Per-feed toggle and on-demand action extract full content with Readability, sanitized
-- [ ] Failure falls back to feed content
-- [ ] Fetching reuses the SSRF-safe fetcher
+- [x] Per-feed toggle and on-demand action extract full content with Readability, sanitized
+- [x] Failure falls back to feed content
+- [x] Fetching reuses the SSRF-safe fetcher

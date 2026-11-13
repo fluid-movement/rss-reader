@@ -1,1 +1,3 @@
 - 2026-11-13T09:28:57Z edited by claude-code: depends_on
+
+- 2026-11-13T11:46:28Z claude-code: Implemented by sonnet; two review rounds by separate sonnet agents. Round 1 found a blocker (49 KB nested-div page froze the server 67s): fixed with a terminable worker thread, pre-scan, caps. Round 2 could not defeat it (event loop lag <12 ms, slots recover, works in node build without src). Optional hardening left: remove thead/tbody from the pre-scan implied-end list (quadratic <thead>x bomb costs a worker the full 5s), remove aborted queue waiters in dom-worker acquire(), slice before sanitizing worker output (1 MB of & becomes 5 MB, 314 ms sanitize).
