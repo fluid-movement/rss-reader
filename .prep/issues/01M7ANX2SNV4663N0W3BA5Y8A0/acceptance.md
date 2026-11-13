@@ -1,5 +1,5 @@
-- [ ] A List Apart and Smashing real fixtures show proper author names; emails and the 'by' boilerplate are not shown; tests cover RSS author, dc:creator, nested markup and parenthesised names
-- [ ] Item pages have a correct document title in all views (feed, folder, search, all)
-- [ ] A removed iframe or video leaves a safe 'Embedded content not shown' hint with an Open original link; the sanitizer still removes the embed and tests cover this
-- [ ] The User-Agent includes a configurable project URL or contact with a documented default, and the scheduler never runs more than the per-host limit concurrently (tested)
-- [ ] 'if a<b then c' keeps its full text; pnpm check and pnpm test pass; verified in a real browser on the real-feed seed
+- [x] A List Apart and Smashing real fixtures show proper author names; emails and the 'by' boilerplate are not shown; tests cover RSS author, dc:creator, nested markup and parenthesised names
+- [x] Item pages have a correct document title in all views (feed, folder, search, all)
+- [x] A removed iframe or video leaves a safe 'Embedded content not shown' hint with an Open original link; the sanitizer still removes the embed and tests cover this
+- [x] The User-Agent includes a configurable project URL or contact with a documented default, and the scheduler never runs more than the per-host limit concurrently (tested)
+- [x] 'if a<b then c' keeps its full text; pnpm check and pnpm test pass; verified in a real browser on the real-feed seed
