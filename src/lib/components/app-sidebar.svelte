@@ -4,6 +4,12 @@
 	import { enhance, type SubmitFunction } from '$app/forms';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
+	import {
+		folderContainsActiveRoute,
+		sidebarRouteActive,
+		writeCollapsedFolders
+	} from '#lib/sidebar-preferences.ts';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -24,11 +30,28 @@
 		Sun,
 		Moon,
 		Monitor,
-		TriangleAlert
+		TriangleAlert,
+		ChevronRight
 	} from '@lucide/svelte';
-	let { data }: { data: ShellData } = $props();
+	let { data, onCollapsedChange }: { data: ShellData; onCollapsedChange: (ids: string[]) => void } =
+		$props();
 	// Folder, feed and view badges share one muted style.
-	const badgeClass = 'font-normal text-muted-foreground';
+	const badgeClass = 'static ml-auto shrink-0 whitespace-nowrap font-normal text-muted-foreground';
+	// SSR and hydration share the cookie-backed layout data; no after-mount collapse.
+	const collapsedFolders = $derived(data.collapsedFolders);
+	function setFolderOpen(folderId: string, open: boolean) {
+		if (folderContainsActiveRoute(page.url.pathname, folderId, data.feeds)) return;
+		const collapsed = collapsedFolders.filter((id) => id !== folderId);
+		if (!open) collapsed.push(folderId);
+		onCollapsedChange(
+			writeCollapsedFolders(
+				() => document,
+				collapsed,
+				data.folders.map((folder) => folder.id),
+				page.url.protocol === 'https:'
+			)
+		);
+	}
 	let refreshing = $state(false);
 	let refreshMessage = $state('');
 	let refreshFailed = $state(false);
@@ -91,7 +114,7 @@
 	function active(href: string) {
 		return href === '/'
 			? page.url.pathname === '/' || page.url.pathname.startsWith('/item/')
-			: page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
+			: sidebarRouteActive(page.url.pathname, href);
 	}
 </script>
 
@@ -143,11 +166,12 @@
 										{...props}
 										href={view.path}
 										aria-current={active(view.href) ? 'page' : undefined}
-										><view.icon /><span>{view.title}</span></a
+										><view.icon /><span class="min-w-0 flex-1 truncate">{view.title}</span>
+										{#if view.count > 0}<Sidebar.MenuBadge class={badgeClass}
+												>{view.count}</Sidebar.MenuBadge
+											>{/if}</a
 									>{/snippet}
-							</Sidebar.MenuButton>{#if view.count > 0}<Sidebar.MenuBadge class={badgeClass}
-									>{view.count}</Sidebar.MenuBadge
-								>{/if}</Sidebar.MenuItem
+							</Sidebar.MenuButton></Sidebar.MenuItem
 						>
 					{/each}
 				</Sidebar.Menu>
@@ -158,42 +182,72 @@
 					><Sidebar.Menu>
 						{#each data.folders as folder (folder.id)}
 							{@const href = `/folder/${folder.id}`}
+							{@const routeActive = folderContainsActiveRoute(
+								page.url.pathname,
+								folder.id,
+								data.feeds
+							)}
+							{@const open = routeActive || !collapsedFolders.includes(folder.id)}
 							<Sidebar.MenuItem>
-								<Sidebar.MenuButton isActive={active(href)}
-									>{#snippet child({ props })}<a
-											{...props}
-											href={resolve('/(app)/folder/[id]', { id: folder.id })}
-											aria-current={active(href) ? 'page' : undefined}
-											><Folder /><span>{folder.name}</span></a
-										>{/snippet}</Sidebar.MenuButton
-								>{#if folderUnread(folder.id) > 0}<Sidebar.MenuBadge class={badgeClass}
-										>{folderUnread(folder.id)}</Sidebar.MenuBadge
-									>{/if}
-								<Sidebar.MenuSub>
-									{#each data.feeds.filter((feed) => feed.folderId === folder.id) as feed (feed.id)}
-										<Sidebar.MenuSubItem
-											><Tooltip.Root disabled={!feedFailure(feed)}>
-												<Tooltip.Trigger>
-													{#snippet child({ props })}<Sidebar.MenuSubButton
-															{...props}
-															href={resolve('/(app)/feed/[id]', { id: feed.id })}
-															isActive={active(`/feed/${feed.id}`)}
-															aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
-															>{@render feedIcon(feed)}<span class="truncate">{feed.title}</span
-															>{#if feedUnread(feed.id) > 0}<span
-																	class="ml-auto text-xs text-muted-foreground tabular-nums"
-																	>{feedUnread(feed.id)}</span
-																>{/if}</Sidebar.MenuSubButton
-														>{/snippet}
-												</Tooltip.Trigger>
-												{#if feedFailure(feed)}<Tooltip.Content
-														role="tooltip"
-														class="max-w-64 break-words">{feedFailure(feed)}</Tooltip.Content
-													>{/if}
-											</Tooltip.Root></Sidebar.MenuSubItem
+								<Collapsible.Root {open} onOpenChange={(value) => setFolderOpen(folder.id, value)}>
+									<div class="flex min-w-0 items-center">
+										<Sidebar.MenuButton isActive={active(href)} class="min-w-0 flex-1"
+											>{#snippet child({ props })}<a
+													{...props}
+													href={resolve('/(app)/folder/[id]', { id: folder.id })}
+													aria-current={active(href) ? 'page' : undefined}
+													><Folder /><span class="min-w-0 flex-1 truncate" title={folder.name}
+														>{folder.name}</span
+													>
+													{#if folderUnread(folder.id) > 0}<Sidebar.MenuBadge class={badgeClass}
+															>{folderUnread(folder.id)}</Sidebar.MenuBadge
+														>{/if}</a
+												>{/snippet}</Sidebar.MenuButton
 										>
-									{/each}
-								</Sidebar.MenuSub>
+										<Collapsible.Trigger disabled={routeActive}>
+											{#snippet child({ props })}
+												<Button
+													{...props}
+													variant="ghost"
+													size="icon"
+													class="size-8 shrink-0"
+													aria-label={`${open ? 'Collapse' : 'Expand'} ${folder.name}`}
+													title={routeActive ? 'The active folder stays expanded' : undefined}
+												>
+													<ChevronRight class={open ? 'rotate-90' : undefined} aria-hidden="true" />
+												</Button>
+											{/snippet}
+										</Collapsible.Trigger>
+									</div>
+									<Collapsible.Content>
+										<Sidebar.MenuSub>
+											{#each data.feeds.filter((feed) => feed.folderId === folder.id) as feed (feed.id)}
+												<Sidebar.MenuSubItem
+													><Tooltip.Root disabled={!feedFailure(feed)}>
+														<Tooltip.Trigger>
+															{#snippet child({ props })}<Sidebar.MenuSubButton
+																	{...props}
+																	href={resolve('/(app)/feed/[id]', { id: feed.id })}
+																	isActive={active(`/feed/${feed.id}`)}
+																	aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
+																	>{@render feedIcon(feed)}<span
+																		class="min-w-0 flex-1 truncate"
+																		title={feed.title}>{feed.title}</span
+																	>{#if feedUnread(feed.id) > 0}<Sidebar.MenuBadge
+																			class={badgeClass}>{feedUnread(feed.id)}</Sidebar.MenuBadge
+																		>{/if}</Sidebar.MenuSubButton
+																>{/snippet}
+														</Tooltip.Trigger>
+														{#if feedFailure(feed)}<Tooltip.Content
+																role="tooltip"
+																class="max-w-64 break-words">{feedFailure(feed)}</Tooltip.Content
+															>{/if}
+													</Tooltip.Root></Sidebar.MenuSubItem
+												>
+											{/each}
+										</Sidebar.MenuSub>
+									</Collapsible.Content>
+								</Collapsible.Root>
 							</Sidebar.MenuItem>
 						{/each}
 						{#each data.feeds.filter((feed) => !feed.folderId) as feed (feed.id)}
@@ -207,7 +261,13 @@
 														{...tooltipProps}
 														href={resolve('/(app)/feed/[id]', { id: feed.id })}
 														aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
-														>{@render feedIcon(feed)}<span>{feed.title}</span></a
+														>{@render feedIcon(feed)}<span
+															class="min-w-0 flex-1 truncate"
+															title={feed.title}>{feed.title}</span
+														>
+														{#if feedUnread(feed.id) > 0}<Sidebar.MenuBadge class={badgeClass}
+																>{feedUnread(feed.id)}</Sidebar.MenuBadge
+															>{/if}</a
 													>{/snippet}</Sidebar.MenuButton
 											>{/snippet}
 									</Tooltip.Trigger>
@@ -215,9 +275,7 @@
 											role="tooltip"
 											class="max-w-64 break-words">{feedFailure(feed)}</Tooltip.Content
 										>{/if}
-								</Tooltip.Root>{#if feedUnread(feed.id) > 0}<Sidebar.MenuBadge class={badgeClass}
-										>{feedUnread(feed.id)}</Sidebar.MenuBadge
-									>{/if}</Sidebar.MenuItem
+								</Tooltip.Root></Sidebar.MenuItem
 							>
 						{/each}
 						<Sidebar.MenuItem

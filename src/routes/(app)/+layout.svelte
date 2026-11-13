@@ -20,6 +20,12 @@
 	}: { data: ShellData & { readerPrefs: { fontSize: number; width: number } }; children: Snippet } =
 		$props();
 	let helpOpen = $state(false);
+	// Both the persistent desktop sidebar and the mounted-on-demand phone drawer share this state.
+	let collapsedFolders = $derived(data.collapsedFolders);
+	const sidebarData = $derived({ ...data, collapsedFolders });
+	function onCollapsedChange(collapsed: string[]) {
+		collapsedFolders = collapsed;
+	}
 	let returnFocusTo: HTMLElement | null = null;
 	const onkeydown = createShortcutHandler(() => {
 		const active = document.activeElement;
@@ -71,7 +77,7 @@
 	<!-- Layout switches with CSS (not a media-query store) so SSR and first paint match the viewport. -->
 	<div class="flex size-full min-w-0 flex-col lg:flex-row">
 		<aside class="hidden h-full w-60 shrink-0 border-r min-[1150px]:w-72 lg:block">
-			<AppSidebar {data} />
+			<AppSidebar data={sidebarData} {onCollapsedChange} />
 		</aside>
 		<header class="flex h-14 shrink-0 items-center gap-3 border-b px-3 lg:hidden">
 			<Sheet.Root bind:open={navigationOpen}>
@@ -89,7 +95,7 @@
 							>Browse articles, feeds, and settings.</Sheet.Description
 						></Sheet.Header
 					>
-					<AppSidebar {data} />
+					<AppSidebar data={sidebarData} {onCollapsedChange} />
 				</Sheet.Content>
 			</Sheet.Root>
 			<a href={resolve('/(app)/(all)')} class="font-semibold tracking-tight">RSS Reader</a>
