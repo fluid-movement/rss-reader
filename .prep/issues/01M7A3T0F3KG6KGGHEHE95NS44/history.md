@@ -1,1 +1,3 @@
 - 2026-11-13T09:28:57Z edited by claude-code: depends_on
+
+- 2026-11-13T10:08:06Z claude-code: Implemented by opencode, reviewed PASS by sonnet. Criterion 1 (image builds/runs) unverified: Docker daemon was down. Run: docker compose up --build -d --wait; curl localhost:5311/health; docker compose exec app pnpm user:create ...
