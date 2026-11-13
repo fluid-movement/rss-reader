@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - '5311:3000'
+    environment:
+      ORIGIN: ${ORIGIN:-http://localhost:5311}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      DATABASE_URL: /data/app.db
+    volumes:
+      - rss-data:/data
+    restart: unless-stopped
+
+volumes:
+  rss-data:

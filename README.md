@@ -36,6 +36,43 @@ pnpm test
 
 Tests use isolated in-memory SQLite databases and the actual generated migrations.
 
+## Coolify deployment
+
+Deploy this repository with Coolify's **Dockerfile** build pack, using the root `Dockerfile` and container port **3000**. Set the public domain to an HTTPS URL and configure these **runtime** environment variables (no build secrets are needed):
+
+| Variable             | Value                                                                                                                                                     |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ORIGIN`             | Exact public HTTPS origin, e.g. `https://reader.example.com`, without a path. Must match the Coolify URL for passkeys, auth cookies and form submissions. |
+| `BETTER_AUTH_SECRET` | Stable high-entropy secret of at least 32 characters; generate with `openssl rand -hex 32`.                                                               |
+| `DATABASE_URL`       | `/data/app.db`                                                                                                                                            |
+
+Add **persistent storage mounted at `/data`** before starting. The image runs as the non-root `node` user (UID/GID 1000); a host bind mount must be writable by that user. A fresh Docker named volume inherits the image directory's ownership. Keep the entire directory persistent, including SQLite's WAL/SHM files; do not mount only the database file. Back up SQLite consistently before upgrades (stop the container before copying the directory, or use SQLite's backup tooling). Never run `db:push` in production.
+
+The Debian slim multi-stage image contains only production dependencies, including the native `better-sqlite3` driver and tools needed by the console command. It starts with `node build`; existing `init()` hooks apply the shipped `drizzle/` migrations before serving. Keep **one replica / one Node process**, without clustering, scale-to-zero or an external cron, so the in-process refresh scheduler can run continuously. The unauthenticated `/health` endpoint is used by the Docker healthcheck; configure Coolify's healthcheck to use `/health` on port 3000 too.
+
+Create the first user from a trusted administrator console after deployment (replace `<container>` with the running container's name or ID):
+
+```sh
+docker exec <container> pnpm user:create --email reader@example.com --name 'Reader' --password 'a-long-unique-password'
+```
+
+The command inherits the container environment; no `.env` file is included in the image. It applies migrations and writes to the same mounted database. Public sign-up remains disabled. Command-line passwords may be visible in shell history/process listings. Retention is a per-user database setting, defaulting to **30 days**, not an environment variable.
+
+### Local container smoke test
+
+Copy `.env.example` to `.env`, set `BETTER_AUTH_SECRET`, and set `ORIGIN=http://localhost:5311`. Compose always uses `/data/app.db`, regardless of the local `.env` database filename:
+
+```sh
+docker compose up --build -d --wait
+curl --fail http://localhost:5311/health
+docker compose exec app pnpm user:create --email reader@example.com --name 'Reader' --password 'a-long-unique-password'
+docker compose down
+```
+
+`docker compose down` preserves the named `rss-data` volume across rebuilds/restarts; `down -v` destroys it. Sign in at `http://localhost:5311/login` while the container is running.
+
+Without Docker, build with `pnpm build`, then run `PORT=5311 node --env-file=.env build` from the application root (set `ORIGIN=http://localhost:5311`). Production does not automatically load `.env`; Coolify supplies the environment directly.
+
 ---
 
 ## Original scaffold reference
