@@ -1,0 +1,6 @@
+- [ ] Safe-area insets are applied (viewport-fit=cover) so header, list, reader and drawer clear the notch and home indicator in standalone and browser modes, verified with emulated insets and on a real phone
+- [ ] Interactive elements measure at least 44x44 CSS px (or have an equivalent padded hit area) with at least 8 px spacing, verified by an automated check across list, reader, sidebar, settings and dialogs at 390 px
+- [ ] Pulling down inside the app does not reload the page and horizontal overscroll does not trigger history navigation in Chrome; scroll chaining between list, reader and drawer is controlled (browser-verified; iOS limits documented)
+- [ ] Inputs do not trigger iOS zoom on focus (16 px) and no horizontal page overflow at 320, 360, 390 and 430 px widths
+- [ ] A shared edge-guard and gesture-threshold helper exists with unit tests (edge start within 28 px ignored, axis lock, velocity/distance thresholds) for the swipe issues to reuse
+- [ ] Desktop layout is unchanged (screenshots at 1280 px compared) and pnpm check and pnpm test pass

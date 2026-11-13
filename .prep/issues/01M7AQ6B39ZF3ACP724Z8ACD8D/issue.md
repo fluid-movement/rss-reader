@@ -7,6 +7,6 @@ depends_on:
 priority: low
 ---
 
-Make navigation feel native: view transitions between list and article (View Transitions API with a fallback), instant feedback on tap, skeleton states while article data loads, preload on touch start, no layout shift, scroll restoration, reduced-motion support. Measure on a throttled mobile profile.
+Make navigation feel native on phones: view transitions between the list and the article (View Transitions API with a graceful fallback and reduced-motion respect), instant tap feedback (no 300 ms delay, pressed states), skeleton states while article data loads, preloading on touch start (data-sveltekit-preload-data) so tapping an article feels instant, no layout shift, correct scroll restoration, and the swipe/pull gestures staying smooth (transform-only, no jank). Measure with a throttled mobile profile (4x CPU slowdown, Fast 3G) before and after, and keep a small performance budget in the README.
+
 ## Open questions
-- Which transitions are worth their complexity.

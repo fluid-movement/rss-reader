@@ -1,12 +1,12 @@
 ---
-title: Mobile navigation structure and reader action bar
+title: Reader action bar on mobile
 kind: code
 parent: 01M7AQ6AQZX31HDYRDW498S7R6
 depends_on:
-  - 01M7AQ6ASHTDEANBMJPPFYBGCK
+  - 01M7AQ6AV6005HWASDH00FPY86
 priority: high
 ---
 
-Rework phone navigation for one-handed use. Evaluate a bottom tab bar (Unread, All, Starred, Search, More/Feeds) against the current hamburger drawer, keep folders and feeds reachable (drawer from the tab bar's Feeds), and add a reader action bar at the bottom of the article view (star, read/unread, share, open original, previous/next) in the thumb zone. Keep safe areas, 44 px targets, keyboard and screen reader behavior, and the list-persistence/back behavior. Desktop layout unchanged.
+Re-scoped by user decision: the hamburger drawer stays for navigation now; a bottom tab bar or other mobile navigation redesign is deferred. This issue adds a bottom action bar to the article view on phones, in the thumb zone: star/unstar, read/unread, share, open original, previous/next with the position indicator from the swipe issue. It respects safe areas and 44 px targets, uses the existing optimistic state helpers, has accessible names and a visible focus order, and may hide on scroll down and reappear on scroll up (but never hide while the user is at the end of the article or interacting with it). Desktop layout unchanged; on phones the existing top toolbar keeps only what does not move to the bar (back, title context).
+
 ## Open questions
-- Bottom tab bar versus keeping the hamburger; which destinations; whether the reader action bar hides on scroll.

@@ -3,9 +3,9 @@ title: Mobile test harness and device checklist
 kind: code
 parent: 01M7AQ6AQZX31HDYRDW498S7R6
 depends_on:
-  - 01M7AQ6ASHTDEANBMJPPFYBGCK
+  - 01M7AQ6AV6005HWASDH00FPY86
 ---
 
-Add touch-emulated Playwright tests (iPhone and Pixel device profiles) for the mobile flows (drawer, list to article, back, swipe between articles, row gestures, pull to refresh, safe-area layout screenshots) and a written real-device checklist (iOS Safari, installed PWA on iOS, Android Chrome) in the README or docs. Tests must run without network using the dev seed or fixtures.
+Add repo-level touch tests and a real-device checklist so the mobile work stays correct. Playwright becomes a dev dependency (reviews have installed it outside the repo so far): add @playwright/test or playwright-core with a mobile project (iPhone and Pixel device profiles, hasTouch, isMobile), a `pnpm test:mobile` script, helpers for touch swipes (CDP Input.dispatchTouchEvent) and login with the dev seed or a small fixture dataset inserted through the service layer (no network), and tests for the flows that exist: drawer, list to article and back (scroll preserved), swipe between articles, row swipes and undo, pull to refresh, safe-area layout screenshots at 360/390/430 px, no horizontal overflow. Document the real-device checklist (iOS Safari, installed PWA on iOS, Android Chrome and installed PWA: edge-swipe behavior, status bar, keyboard, share sheet, install flow) in the README. Tests must run offline and reliably in CI; browsers are installed with `npx playwright install chromium` (documented), never committed.
+
 ## Open questions
-- Whether Playwright becomes a dev dependency of the repo (today reviews install it outside the repo).

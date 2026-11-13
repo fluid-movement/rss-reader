@@ -4,6 +4,6 @@ kind: code
 parent: 01M7AQ6AQZX31HDYRDW498S7R6
 ---
 
-Reading experience on a phone: image viewer (tap to zoom, pinch, close), horizontally scrollable tables and code blocks without page overflow, embedded video placeholder tap target, readable measure and spacing at 390 px with the reader font-size setting, collapsing header or toolbar on scroll, optional reading progress, links open sensibly in the installed PWA, share sheet integration. Uses real articles from the real-feed seed.
+Reading experience on a phone, using real articles from the real-feed seed: image viewer (tap an image to open a full-screen viewer with pinch-zoom/double-tap and close by swipe down or a close button, accessible), tables and code blocks scroll horizontally inside their own container without causing page overflow, the removed-embed placeholder has a proper tap target and 'Open original' link, readable measure and spacing at 360-430 px with the reader font-size setting (also verify the largest font and content width settings), a collapsing top header on scroll down that returns on scroll up (never hiding the only way back), links in articles open sensibly (external in a new tab, in the installed PWA via the system browser or an in-app view as appropriate), share sheet integration verified. No new heavy dependencies unless justified; keep sanitization untouched.
+
 ## Open questions
-- None yet; decide which polish items are worth it after trying the foundations.

@@ -1,0 +1,4 @@
+- [ ] On phone widths the article view has a bottom action bar with star, read/unread, share, open original and previous/next, all at least 44 px with safe-area padding, verified in emulation and screenshots at 390 px light and dark
+- [ ] The actions use the existing optimistic state helpers with rollback toasts, and the bar has correct accessible names, focus order and state (pressed/unpressed)
+- [ ] The bar hides on scroll down and returns on scroll up without layout jumps, and stays visible at the end of the article
+- [ ] Desktop layout and keyboard shortcuts are unchanged; pnpm check and pnpm test pass

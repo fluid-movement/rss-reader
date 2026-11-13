@@ -1,0 +1,4 @@
+- [ ] Pulling down at the top of the list refreshes the current view with an indicator, spinner and result toast, verified with touch emulation on a phone viewport
+- [ ] The gesture only starts at scrollTop 0, does not trigger from a downward drag mid-list, in the drawer or on a row swipe, and the browser's own pull-to-refresh/reload does not fire
+- [ ] A visible Refresh control exists with accessible name and works; cooldown and failure cases show the right toasts
+- [ ] Reduced-motion and keyboard users have a working alternative; new items appear after refresh without resetting scroll or the open article; pnpm check and pnpm test pass

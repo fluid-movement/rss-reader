@@ -1,0 +1,4 @@
+- [ ] Swiping a row right toggles read and left toggles star with a reveal, threshold and snap-back, an Undo toast, and no activation on vertical scroll or edge starts, verified with touch emulation
+- [ ] Long-press and a visible overflow button open the row menu with read/unread, star, share, open original, copy link, mark above/below as read; all actions have accessible names and work with keyboard and screen reader
+- [ ] Mark all read asks for confirmation above 10 items and Undo restores exactly the affected items; mark above/below also offer Undo
+- [ ] Optimistic updates, rollback toasts, counts and cross-client sync still work; desktop pointer behavior is unchanged; pnpm check and pnpm test pass

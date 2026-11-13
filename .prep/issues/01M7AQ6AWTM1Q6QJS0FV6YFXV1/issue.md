@@ -6,7 +6,6 @@ depends_on:
   - 01M7AQ6ASHTDEANBMJPPFYBGCK
 ---
 
-In the article list on a phone: swipe a row right to toggle read and left to toggle star (default Reeder-style, configurable in Settings), with an undo toast, haptic-free visual affordances, and no conflict with vertical scrolling; long-press (or a visible overflow button) opens a menu: mark read/unread, star, share, open original, mark above/below as read, copy link. Every swipe action has a non-gesture alternative (the menu). Mark all read keeps a confirmation or undo. Optimistic state, rollback and sync must keep working.
+In the article list on a phone: swipe a row RIGHT to toggle read and LEFT to toggle star (Reeder convention, decided; configurable in Settings later), with a coloured action reveal under the row, a threshold and snap-back, an Undo toast after each swipe action, and the shared edge-guard (touches starting within about 24-28 px of an edge are ignored) and axis lock so vertical scrolling stays native. A long-press (or a visible overflow button on each row for accessibility and pointer users) opens a menu: mark read/unread, star/unstar, share, open original, copy link, mark above as read, mark below as read. Every swipe action has a non-gesture alternative via that menu. Mark all read (existing menu) shows a confirmation dialog when it affects more than 10 items and always offers an Undo toast; undo restores the previous read state for exactly the affected items. Optimistic state, rollback toasts and sync keep working; no accidental activation while scrolling. Mark-as-read-on-scroll is NOT part of this issue.
+
 ## Open questions
-- Which actions on which swipe direction by default; whether to add mark-as-read-on-scroll as an opt-in setting (off by default).
-- Confirmation versus undo for bulk actions.
