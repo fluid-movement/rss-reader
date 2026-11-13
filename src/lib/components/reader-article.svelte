@@ -43,6 +43,7 @@
 	let image = $state<{ src: string; alt: string; trigger: HTMLElement } | null>(null);
 	let collapsed = $state(false);
 	let headerFocused = $state(false);
+	let barFocused = $state(false);
 	let scrollAnchor = 0;
 	let scrollArticleId = '';
 	function trackScroll(event: Event) {
@@ -98,6 +99,12 @@
 			timeZone: 'UTC'
 		}).format(date);
 	}
+	function toggleStar() {
+		void updateArticle(selected, { starred: !isStarred(selected) });
+	}
+	function toggleRead() {
+		void updateArticle(selected, { read: !isRead(selected) });
+	}
 	async function share() {
 		if (!original || sharing) return;
 		sharing = true;
@@ -112,7 +119,7 @@
 	}
 </script>
 
-<section aria-label="Article reader" class="flex h-full min-w-0 flex-col">
+<section aria-label="Article reader" class="relative flex h-full min-w-0 flex-col">
 	<header
 		class="reader-toolbar shrink-0 border-b px-4 py-2"
 		onfocusin={() => {
@@ -131,7 +138,7 @@
 				class="min-h-11 max-w-full whitespace-normal"
 				><ArrowLeft data-icon="inline-start" />Back to {data.viewTitle}</Button
 			>
-			<div class="flex shrink-0 items-center gap-1">
+			<div class="flex shrink-0 items-center gap-1 max-sm:hidden">
 				<Button
 					variant="ghost"
 					size="icon"
@@ -155,7 +162,7 @@
 				>
 			</div>
 		</div>
-		<div class="action-slot">
+		<div class="action-slot max-sm:hidden">
 			<div
 				data-reader-actions
 				class="reader-actions flex flex-wrap items-center gap-1 max-lg:gap-2 [&_a]:min-h-11 [&_button]:min-h-11"
@@ -166,7 +173,7 @@
 					variant="ghost"
 					size="sm"
 					aria-pressed={isStarred(selected)}
-					onclick={() => updateArticle(selected, { starred: !isStarred(selected) })}
+					onclick={toggleStar}
 					><Star
 						data-icon="inline-start"
 						class={isStarred(selected) ? 'fill-current text-amber-500' : ''}
@@ -175,7 +182,7 @@
 				<Button
 					variant="ghost"
 					size="sm"
-					onclick={() => updateArticle(selected, { read: !isRead(selected) })}
+					onclick={toggleRead}
 					>{#if isRead(selected)}<Mail data-icon="inline-start" />Mark unread{:else}<MailOpen
 							data-icon="inline-start"
 						/>Mark read{/if}</Button
@@ -249,6 +256,74 @@
 			</article>
 		</div>
 	{/key}
+	<!-- Phone action bar in the thumb zone; the top toolbar keeps back and title context. -->
+	<div
+		class="reader-bar flex items-center justify-around border-t bg-background sm:hidden"
+		role="toolbar"
+		aria-label="Article actions"
+		data-collapsed={collapsed && !barFocused}
+		inert={collapsed && !barFocused}
+		onfocusin={() => {
+			barFocused = true;
+		}}
+		onfocusout={(event) => {
+			if (!event.currentTarget.contains(event.relatedTarget as Node | null)) barFocused = false;
+		}}
+	>
+		<Button
+			variant="ghost"
+			size="icon"
+			class="size-11"
+			aria-label="Star"
+			aria-pressed={isStarred(selected)}
+			onclick={toggleStar}
+			><Star class={isStarred(selected) ? 'fill-current text-amber-500' : ''} /></Button
+		>
+		<Button
+			variant="ghost"
+			size="icon"
+			class="size-11"
+			aria-label={isRead(selected) ? 'Mark as unread' : 'Mark as read'}
+			onclick={toggleRead}>{#if isRead(selected)}<Mail />{:else}<MailOpen />{/if}</Button
+		>
+		<Button
+			variant="ghost"
+			size="icon"
+			class="size-11"
+			aria-label="Share"
+			disabled={!original || sharing}
+			onclick={share}><Share2 /></Button
+		>
+		{#if original}<Button
+				href={original}
+				target="_blank"
+				rel="noopener noreferrer"
+				variant="ghost"
+				size="icon"
+				class="size-11"
+				aria-label="Open original"><ExternalLink /></Button
+			>{/if}
+		<Button
+			variant="ghost"
+			size="icon"
+			class="size-11"
+			aria-label="Previous article"
+			disabled={!position.canPrevious}
+			onclick={() => step(-1)}><ChevronLeft /></Button
+		>
+		{#if position.index >= 0}<span
+				class="min-w-10 text-center text-xs whitespace-nowrap text-muted-foreground tabular-nums"
+				>{position.index + 1} of {position.count}{position.hasMore ? '+' : ''}</span
+			>{/if}
+		<Button
+			variant="ghost"
+			size="icon"
+			class="size-11"
+			aria-label="Next article"
+			disabled={!position.canNext}
+			onclick={() => step(1)}><ChevronRight /></Button
+		>
+	</div>
 </section>
 
 {#if image}<ArticleImageViewer
@@ -290,47 +365,29 @@
 	.reader-content {
 		overflow-wrap: anywhere;
 	}
+	.reader-bar {
+		position: absolute;
+		inset-inline: 0;
+		bottom: 0;
+		z-index: 1;
+		padding: 0.25rem 0.5rem calc(0.25rem + var(--sab, 0px));
+		transition: transform 160ms ease;
+	}
+	.reader-bar[data-collapsed='true'] {
+		transform: translateY(100%);
+	}
 	@media (max-width: 639px) {
 		.reader-toolbar {
 			display: block;
-			position: relative;
-			z-index: 1;
-			background: var(--background);
 		}
-		.action-slot {
-			height: 0;
-			overflow: visible;
-		}
-		.reader-actions {
-			position: absolute;
-			inset-inline: 0;
-			top: 100%;
-			height: 48px;
-			padding-inline: 1rem;
-			background: var(--background);
-			border-bottom: 1px solid var(--border);
-			flex-wrap: nowrap;
-			justify-content: space-between;
-			gap: 0;
-		}
-		.reader-actions :global(button),
-		.reader-actions :global(a) {
-			padding-inline: 0.5rem;
-			font-size: 0.75rem;
-		}
-		.reader-actions :global(svg) {
-			display: none;
-		}
-		.reader-scroll {
-			position: relative;
-			z-index: 0;
-		}
+		/* The bar overlays the scroller, so reserve its height to avoid a jump when it hides. */
 		.reader-content {
-			padding-top: calc(2rem + 48px);
+			padding-bottom: calc(2rem + 3.5rem + var(--sab, 0px));
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.reader-actions {
+		.reader-actions,
+		.reader-bar {
 			transition: none;
 		}
 	}
