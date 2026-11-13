@@ -2,7 +2,7 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import type { AppDatabase } from '../db/connect';
 import { items } from '../db/schema';
 import { sanitizeArticle, webUrl } from '../reader-content';
-import { DomParseError, parseArticleInWorker } from './dom-worker';
+import { DomParseError, MAX_PARSED_CHARS, parseArticleInWorker } from './dom-worker';
 import { FeedFetchError, safeFetch } from './fetch';
 
 /** Article pages are capped well below the feed limit; extraction is best effort. */
@@ -35,7 +35,7 @@ export async function extractArticleHtml(link: string, signal?: AbortSignal): Pr
 		if (error instanceof DomParseError) throw new ExtractError(error.message);
 		throw error;
 	}
-	const html = sanitizeArticle(parsed?.content ?? '', page.url).trim();
+	const html = sanitizeArticle((parsed?.content ?? '').slice(0, MAX_PARSED_CHARS), page.url).trim();
 	if (!parsed || !html || !parsed.text.trim())
 		throw new ExtractError('No article content was found on the page.');
 	return html.slice(0, MAX_STORED_CHARS);

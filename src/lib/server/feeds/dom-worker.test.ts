@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { connectDatabase } from '../db/connect';
 import { migrateDatabase } from '../db/migrate';
 import { feeds, items, user } from '../db/schema';
-import { DomParseError, MAX_WORKERS, parseArticleInWorker, workerStats } from './dom-worker';
+import {
+	DomParseError,
+	assertReasonableMarkup,
+	MAX_PARSED_CHARS,
+	MAX_WORKERS,
+	parseArticleInWorker,
+	workerStats
+} from './dom-worker';
 import { ExtractError, extractArticleHtml, extractNewItems } from './extract';
 import { safeFetch } from './fetch';
 
@@ -54,6 +61,50 @@ describe('hostile markup (worker isolation)', () => {
 			page(`<html><body>${'<span>x</span>'.repeat(30_000)}</body></html>`)
 		);
 		await expect(extractArticleHtml('https://news.example/a')).rejects.toThrow('too complex');
+	});
+	it.each(['thead', 'tbody'])('rejects repeated %s before allocating a worker', async (tag) => {
+		const started = performance.now();
+		await expect(
+			parseArticleInWorker(`<html><body>${`<${tag}>x`.repeat(25_000)}</body></html>`)
+		).rejects.toThrow('too complex');
+		expect(performance.now() - started).toBeLessThan(500);
+		expect(workerStats.active).toBe(0);
+	});
+	it.each([
+		['unterminated open tags', '<div '.repeat(49_990) + 'x'.repeat(1_800_000) + '/>'],
+		['unclosed tag-like fragments', '<b</b'.repeat(24_990) + 'x'.repeat(2_000_000)]
+	])('pre-scans %s in linear time and still accepts them', (_name, markup) => {
+		const started = performance.now();
+		expect(() => assertReasonableMarkup(markup)).not.toThrow();
+		expect(performance.now() - started).toBeLessThan(100);
+	});
+	it('logs a known worker memory limit as one warning without a stack', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		// Cheap to pre-scan, but entity expansion exhausts the worker's heap limit.
+		const flood = `<html><body><p>${'&amp;'.repeat(1_400_000)}</p></body></html>`;
+		await expect(parseArticleInWorker(flood, undefined, 20_000)).rejects.toThrow(DomParseError);
+		expect(warn).toHaveBeenCalledOnce();
+		expect(String(warn.mock.calls[0][0])).toContain('ERR_WORKER_OUT_OF_MEMORY');
+		expect(String(warn.mock.calls[0][0])).not.toContain('\n    at ');
+		expect(error).not.toHaveBeenCalled();
+		warn.mockRestore();
+		error.mockRestore();
+	});
+	it('caps entity-expanded output before main-thread sanitization', async () => {
+		const body = `<html><body><article><p>${'&'.repeat(1024 * 1024)}</p></article></body></html>`;
+		const parsed = await parseArticleInWorker(body);
+		expect(parsed?.content.length).toBeLessThanOrEqual(MAX_PARSED_CHARS);
+		expect(parsed?.text.length).toBeLessThanOrEqual(MAX_PARSED_CHARS);
+		vi.mocked(safeFetch).mockResolvedValue(page(body));
+		const { worst } = await withLagProbe(async () => {
+			expect((await extractArticleHtml('https://news.example/a')).length).toBeLessThanOrEqual(
+				MAX_PARSED_CHARS
+			);
+			// Let the probe observe the final synchronous sanitization, too.
+			await new Promise((resolve) => setTimeout(resolve, 15));
+		});
+		expect(worst).toBeLessThan(200);
 	});
 	it('terminates a worker that exceeds its deadline without blocking or leaking', async () => {
 		const { worst } = await withLagProbe(() =>

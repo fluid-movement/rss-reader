@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { parseHTML } from 'linkedom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { connectDatabase } from '../db/connect';
@@ -66,6 +67,78 @@ describe('extractArticleHtml', () => {
 	it('strips hostile markup', async () => {
 		const result = await extractArticleHtml('https://news.example/a/b');
 		expect(result).not.toMatch(/<script|<iframe|onclick|javascript:|alert/i);
+	});
+	it('cleans a real BBC video caption and repairs its adjacent byline spans', async () => {
+		const bbc = readFileSync(new URL('./fixtures/real-bbc-article.html', import.meta.url), 'utf8');
+		vi.mocked(safeFetch).mockResolvedValue(page(bbc));
+		const result = await extractArticleHtml('https://news.example/a');
+		const { document } = parseHTML(result);
+		// Readability may omit the byline entirely (the reader has author metadata).
+		const text = document.documentElement.textContent.replace(/\s+/g, ' ');
+		if (text.includes('Henry Moore')) expect(text).toContain('By Henry Moore and Laura Cress');
+		expect(text).not.toContain('ByHenry');
+		expect(result).toContain('A major global Microsoft outage');
+		expect(result).not.toMatch(/Figure caption|Watch:|This video can not be played/);
+	});
+	it('keeps real Wired prose, photo and credit while dropping empty figures', async () => {
+		const wired = readFileSync(
+			new URL('./fixtures/real-wired-article.html', import.meta.url),
+			'utf8'
+		);
+		// Also cover figures left empty by missing/unsupported publisher media.
+		const body = wired.replace(
+			'<div></div>',
+			'<figure><span> </span></figure><figure><img></figure><figure><iframe src="https://www.youtube.com/embed/example"></iframe></figure>'
+		);
+		vi.mocked(safeFetch).mockResolvedValue(page(body));
+		const result = await extractArticleHtml('https://news.example/a');
+		const { document } = parseHTML(result);
+		expect(result).toContain('Unlike a bulky');
+		expect(result).toContain('Courtesy of Urevo');
+		expect(document.querySelector('img')?.getAttribute('src')).toContain(
+			'https://media.wired.com/'
+		);
+		expect(document.querySelectorAll('figure').length).toBeGreaterThan(0);
+		for (const figure of document.querySelectorAll('figure')) {
+			expect(!!figure.textContent.trim() || !!figure.querySelector('img[src]')).toBe(true);
+		}
+	});
+	it('preserves meaningful image captions and text-only figures', async () => {
+		const figures =
+			'<figure><img src="/diagram.png"><figcaption><span class="visually-hidden">Figure caption, </span>A useful explanation.</figcaption></figure>' +
+			'<figure><figcaption>A diagram described entirely in words.</figcaption></figure>';
+		vi.mocked(safeFetch).mockResolvedValue(page(html.replace('<img', `${figures}<img`)));
+		const result = await extractArticleHtml('https://news.example/a');
+		expect(result).toContain('A useful explanation.');
+		expect(result).toContain('A diagram described entirely in words.');
+		expect(result).toContain('src="https://news.example/diagram.png"');
+		expect(result).not.toContain('Figure caption,');
+	});
+	it('keeps a meaningful caption of an image-less video figure but drops the media', async () => {
+		const caption = 'Meaningful caption about the video content that readers should keep';
+		const figures =
+			`<figure><video src="x.mp4"></video><figcaption>${caption}</figcaption></figure>` +
+			'<figure><video src="y.mp4"></video><figcaption>Short clip</figcaption></figure>' +
+			'<figure><iframe src="https://www.youtube.com/embed/e"></iframe></figure>';
+		vi.mocked(safeFetch).mockResolvedValue(page(html.replace('<img', `${figures}<img`)));
+		const result = await extractArticleHtml('https://news.example/a');
+		expect(result).toContain(caption);
+		expect(result).not.toMatch(/<video|<iframe|Short clip/);
+	});
+	it('repairs the reported multi-author byline without changing prose word fragments', async () => {
+		const byline =
+			'<div data-testid="multi-byline"><span>By</span><span>Helen Davidson</span><span>Jessica Lamb</span><span> and Helen Sullivan</span></div>';
+		const body = html.replace(
+			'<img',
+			`${byline}<p>exam<span>ple</span>, <em>emphasis</em>!</p><img`
+		);
+		vi.mocked(safeFetch).mockResolvedValue(page(body));
+		const result = await extractArticleHtml('https://news.example/a');
+		const { document } = parseHTML(result);
+		expect(document.documentElement.textContent).toContain(
+			'By Helen Davidson Jessica Lamb and Helen Sullivan'
+		);
+		expect(document.documentElement.textContent).toContain('example, emphasis!');
 	});
 	it('rejects non-HTML content types', async () => {
 		vi.mocked(safeFetch).mockResolvedValue(page('{}', 'application/json'));
