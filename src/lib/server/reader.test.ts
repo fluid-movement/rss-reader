@@ -88,7 +88,8 @@ describe('user-scoped reader queries', () => {
 			author: 'A. Writer',
 			link: 'https://example.com/story',
 			summary: 'Preview',
-			sanitizedContent: '<p>Full body</p>'
+			sanitizedContent: '<p>Feed body</p>',
+			sanitizedFullContent: '<p>Full body</p>'
 		});
 	});
 	it('keeps nested feed and folder lists scoped and provides shareable back paths', () => {

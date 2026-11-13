@@ -1,4 +1,5 @@
 <script lang="ts">
+	import FullTextArticle from '#lib/components/full-text-article.svelte';
 	import { untrack } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { ArrowLeft, ExternalLink, Share2, Star, MailOpen, Mail } from '@lucide/svelte';
@@ -125,10 +126,14 @@
 					</div>
 				</header>
 				<!-- Only the server-sanitized article body may be rendered as HTML. -->
-				<div class="article-prose">
-					<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitizedContent is sanitized by sanitize-html on the server. -->
-					{@html selected.sanitizedContent}
-				</div>
+				<FullTextArticle item={selected}>
+					{#snippet body(html)}
+						<div class="article-prose">
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is sanitized by sanitize-html on the server. -->
+							{@html html}
+						</div>
+					{/snippet}
+				</FullTextArticle>
 			</article>
 		</ScrollArea>
 	{/key}

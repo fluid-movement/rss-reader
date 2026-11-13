@@ -1,6 +1,7 @@
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import type { AppDatabase } from './db/connect';
 import { feeds } from './db/schema';
+import { extractNewItems } from './feeds/extract';
 import { FeedFetchError, safeFetch } from './feeds/fetch';
 import { FeedParseError, parseFeed } from './feeds/parse';
 import { createFeedService, FeedValidationError } from './feeds/subscribe';
@@ -22,6 +23,8 @@ export function createScheduler(db: AppDatabase) {
 	const service = createFeedService(db);
 	const running = new Map<string, Promise<RefreshResult>>();
 	const manualAttempts = new Map<string, number>();
+	let stopping = new AbortController();
+	const extractions = new Set<Promise<void>>();
 	const batches = new Map<string, Promise<RefreshSummary>>();
 	const queue: Array<() => void> = [];
 	let active = 0;
@@ -50,13 +53,14 @@ export function createScheduler(db: AppDatabase) {
 			});
 			const parsed =
 				response.status === 304 ? undefined : await parseFeed(response.body, response.url);
+			let newItemIds: string[] = [];
 			const now = new Date();
 			const interval = feed.refreshIntervalMinutes > 0 ? feed.refreshIntervalMinutes : 30;
 			db.transaction(() => {
 				// Do not insert orphaned items if the user unsubscribed during the fetch.
 				const current = db.select().from(feeds).where(eq(feeds.id, feedId)).get();
 				if (!current) return;
-				if (parsed) service.ingestItems(feedId, parsed.items);
+				if (parsed) newItemIds = service.ingestItemIds(feedId, parsed.items);
 				db.update(feeds)
 					.set({
 						errorCount: 0,
@@ -73,6 +77,13 @@ export function createScheduler(db: AppDatabase) {
 					.where(eq(feeds.id, feedId))
 					.run();
 			});
+			if (feed.extractFullText && newItemIds.length) {
+				// Never fails the refresh; bounded concurrency and per-refresh cap.
+				const job = extractNewItems(db, newItemIds, {
+					signal: stopping.signal
+				}).finally(() => extractions.delete(job));
+				extractions.add(job);
+			}
 			return { status: 'refreshed' };
 		} catch (error) {
 			const safeError = error instanceof FeedFetchError || error instanceof FeedParseError;
@@ -182,9 +193,16 @@ export function createScheduler(db: AppDatabase) {
 	async function stop() {
 		clearInterval(timer);
 		timer = undefined;
-		await Promise.allSettled([...running.values(), ...(ticking ? [ticking] : [])]);
+		// Extraction is best effort: cancel it and never let it delay shutdown.
+		stopping.abort();
+		await Promise.allSettled([...running.values(), ...extractions, ...(ticking ? [ticking] : [])]);
+		stopping = new AbortController();
 	}
-	return { refreshFeed, refreshAll, tick, start, stop };
+	/** Resolves when background full-text extraction has finished (used by tests). */
+	async function extractionsSettled() {
+		await Promise.allSettled([...extractions]);
+	}
+	return { refreshFeed, refreshAll, tick, start, stop, extractionsSettled };
 }
 
 // Keep both the timer and its overlap locks across development module reloads.

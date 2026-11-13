@@ -39,7 +39,8 @@ export function createFeedService(db: AppDatabase) {
 		return name;
 	}
 
-	function ingestItems(feedId: string, parsedItems: ParsedItem[]) {
+	/** Inserts new items and returns their ids (in insertion order). */
+	function ingestItemIds(feedId: string, parsedItems: ParsedItem[]): string[] {
 		return db.transaction((tx) => {
 			const feed = tx
 				.select({ url: feeds.url, siteUrl: feeds.siteUrl })
@@ -52,7 +53,7 @@ export function createFeedService(db: AppDatabase) {
 				.where(eq(items.feedId, feedId))
 				.all();
 			const guids = new Set(existing.map((item) => item.guid));
-			let inserted = 0;
+			const inserted: string[] = [];
 			for (const item of parsedItems) {
 				// The parser already uses the link as GUID only when no explicit ID exists.
 				// Distinct explicit GUIDs may legitimately share the same article URL.
@@ -67,16 +68,23 @@ export function createFeedService(db: AppDatabase) {
 						summary: sanitizeContent(item.summary, contentBase)
 					})
 					.onConflictDoNothing({ target: [items.feedId, items.guid] })
-					.run();
-				inserted += result.changes;
+					.returning({ id: items.id })
+					.all();
+				inserted.push(...result.map((row) => row.id));
 				guids.add(item.guid);
 			}
 			return inserted;
 		});
 	}
 
+	/** Number of newly inserted items. */
+	function ingestItems(feedId: string, parsedItems: ParsedItem[]) {
+		return ingestItemIds(feedId, parsedItems).length;
+	}
+
 	return {
 		ingestItems,
+		ingestItemIds,
 		/** OPML subscriptions are queued without discovery or network access. */
 		queueFeed(userId: string, url: string, title: string, folderId?: string) {
 			requireFolder(userId, folderId);
@@ -147,6 +155,13 @@ export function createFeedService(db: AppDatabase) {
 		removeFeed(userId: string, feedId: string) {
 			requireFeed(userId, feedId);
 			db.delete(feeds)
+				.where(and(eq(feeds.id, feedId), eq(feeds.userId, userId)))
+				.run();
+		},
+		setExtractFullText(userId: string, feedId: string, enabled: boolean) {
+			requireFeed(userId, feedId);
+			db.update(feeds)
+				.set({ extractFullText: enabled })
 				.where(and(eq(feeds.id, feedId), eq(feeds.userId, userId)))
 				.run();
 		},

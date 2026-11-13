@@ -90,6 +90,15 @@ describe('subscription and immediate ingestion', () => {
 		await service.subscribeToFeed('other', feed.url);
 		expect(connection.db.select().from(items).all()).toHaveLength(8);
 	});
+	it('reports the ids of newly inserted items only', async () => {
+		const feed = await service.subscribeToFeed('owner', 'https://example.com/rss');
+		const parsed = await parseFeed(fixture('rss.xml'), feed.url);
+		const fresh = { ...parsed.items[0], guid: 'fresh' };
+		const ids = service.ingestItemIds(feed.id, [parsed.items[0], fresh, fresh]);
+		const row = connection.db.select().from(items).where(eq(items.guid, 'fresh')).get()!;
+		expect(ids).toEqual([row.id]);
+		expect(service.ingestItemIds(feed.id, [fresh])).toEqual([]);
+	});
 	it('resolves relative content again at the ingest boundary before storage', async () => {
 		const feed = await service.subscribeToFeed('owner', 'https://example.com/rss');
 		const parsed = await parseFeed(fixture('rss.xml'), feed.url);

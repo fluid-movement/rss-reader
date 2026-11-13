@@ -247,4 +247,75 @@ describe('refresh scheduler', () => {
 		await scheduler.refreshFeed('removed');
 		expect(connection.db.select().from(items).all()).toHaveLength(0);
 	});
+	describe('full-text extraction', () => {
+		const article = readFileSync(new URL('./feeds/fixtures/article.html', import.meta.url), 'utf8');
+		function route(articleFails = false) {
+			vi.mocked(safeFetch).mockImplementation(async (input) => {
+				const url = String(input);
+				if (/\/(one|two)$/.test(url)) {
+					if (articleFails) throw new Error('boom');
+					return {
+						url,
+						status: 200,
+						headers: new Headers({ 'content-type': 'text/html' }),
+						body: article
+					};
+				}
+				return response();
+			});
+		}
+		const articleCalls = () =>
+			vi.mocked(safeFetch).mock.calls.filter(([url]) => /\/(one|two)$/.test(String(url))).length;
+
+		it('extracts only newly inserted items of opted-in feeds', async () => {
+			add('on', { extractFullText: true });
+			add('off');
+			route();
+			await scheduler.refreshFeed('on');
+			await scheduler.refreshFeed('off');
+			await scheduler.extractionsSettled();
+			const rows = connection.db.select().from(items).all();
+			expect(rows.filter((row) => row.fullContent).length).toBe(2);
+			expect(rows.every((row) => row.feedId === 'on' || !row.fullContent)).toBe(true);
+			expect(articleCalls()).toBe(2);
+			// A second refresh inserts nothing new, so nothing is fetched again.
+			await scheduler.refreshFeed('on');
+			await scheduler.extractionsSettled();
+			expect(articleCalls()).toBe(2);
+		});
+		it('stop() cancels extraction in flight instead of waiting for it', async () => {
+			add('on', { extractFullText: true });
+			vi.mocked(safeFetch).mockImplementation(async (input) => {
+				if (/\/(one|two)$/.test(String(input))) return new Promise<never>(() => {});
+				return response();
+			});
+			await scheduler.refreshFeed('on');
+			expect(articleCalls()).toBe(2);
+			await scheduler.stop();
+			expect(
+				connection.db
+					.select()
+					.from(items)
+					.all()
+					.every((row) => !row.fullContent)
+			).toBe(true);
+		});
+		it('never fails the refresh or stores errors when extraction fails', async () => {
+			add('on', { extractFullText: true });
+			route(true);
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			expect(await scheduler.refreshFeed('on')).toEqual({ status: 'refreshed' });
+			await scheduler.extractionsSettled();
+			expect(get('on').lastError).toBeNull();
+			expect(connection.db.select().from(items).all().length).toBe(3);
+			expect(
+				connection.db
+					.select()
+					.from(items)
+					.all()
+					.every((row) => !row.fullContent)
+			).toBe(true);
+			expect(error).toHaveBeenCalled();
+		});
+	});
 });

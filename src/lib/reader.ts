@@ -22,7 +22,10 @@ export interface ArticleCursor {
 export interface ReaderItem extends ArticlePreview {
 	author: string | null;
 	link: string | null;
+	/** Feed-provided content (or summary), sanitized. */
 	sanitizedContent: string;
+	/** Extracted full article, sanitized; null when not loaded. */
+	sanitizedFullContent: string | null;
 }
 
 /** List-level data, loaded by the view layout and kept while articles are opened. */

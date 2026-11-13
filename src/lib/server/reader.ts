@@ -224,6 +224,8 @@ export function getSelectedItem(
 		starred: item.starred,
 		author: item.author,
 		link: webUrl(item.link),
-		sanitizedContent: sanitizeArticle(item.fullContent || item.content || item.summary, item.link)
+		sanitizedContent: sanitizeArticle(item.content || item.summary, item.link),
+		// Stored full text is re-sanitized: the database is not a trust boundary.
+		sanitizedFullContent: item.fullContent ? sanitizeArticle(item.fullContent, item.link) : null
 	};
 }

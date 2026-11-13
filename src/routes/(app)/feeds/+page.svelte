@@ -7,6 +7,7 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import * as NativeSelect from '#lib/components/ui/native-select/index.js';
 	import type { PageProps } from './$types';
 
@@ -141,7 +142,12 @@
 								{/if}
 							</div>
 							<div class="flex flex-wrap items-end gap-3">
-								<form method="POST" action="?/moveFeed" use:enhance={submit} class="min-w-0 flex-1">
+								<form
+									method="POST"
+									action="?/moveFeed"
+									use:enhance={submit}
+									class="w-full min-w-0 sm:w-auto sm:flex-1"
+								>
 									<input type="hidden" name="feedId" value={feed.id} />
 									<Field.Group class="flex-row items-end gap-3">
 										<Field.Field class="min-w-0 flex-1">
@@ -189,6 +195,36 @@
 									>
 								</form>
 							</div>
+							<form
+								method="POST"
+								action="?/setExtractFullText"
+								use:enhance={submit}
+								class="flex min-w-0 items-start gap-3"
+							>
+								<input type="hidden" name="feedId" value={feed.id} />
+								<input type="hidden" name="enabled" value={String(!feed.extractFullText)} />
+								<Switch
+									id={`feed-fulltext-${feed.id}`}
+									class="mt-0.5"
+									checked={feed.extractFullText}
+									disabled={pending}
+									onCheckedChange={() => {
+										const input = document.getElementById(`feed-fulltext-${feed.id}`);
+										input?.closest('form')?.requestSubmit();
+									}}
+								/>
+								<div class="flex min-w-0 flex-col gap-0.5">
+									<Field.Label for={`feed-fulltext-${feed.id}`}
+										>Fetch full articles<span class="sr-only">
+											for {feed.title || feed.url}</span
+										></Field.Label
+									>
+									<p class="text-sm text-muted-foreground">
+										Extracts the first 10 new articles per refresh; use Load full article for
+										others.
+									</p>
+								</div>
+							</form>
 						</li>
 					{:else}
 						<li class="text-sm text-muted-foreground">
