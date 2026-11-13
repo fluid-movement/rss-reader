@@ -1,5 +1,5 @@
-- [ ] Drizzle schema covers folders, feeds, items, per-user item state, with user scoping and migrations
-- [ ] Better Auth email+password and passkey sign-in work; sign-up endpoints are disabled
-- [ ] A console command creates a user
-- [ ] All app routes require a session; unauthenticated users are redirected to login
-- [ ] pnpm check passes
+- [x] Drizzle schema covers folders, feeds, items, per-user item state, with user scoping and migrations
+- [x] Better Auth email+password and passkey sign-in work; sign-up endpoints are disabled
+- [x] A console command creates a user
+- [x] All app routes require a session; unauthenticated users are redirected to login
+- [x] pnpm check passes
