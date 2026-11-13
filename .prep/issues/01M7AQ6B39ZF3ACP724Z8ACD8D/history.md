@@ -1,3 +1,7 @@
 - 2026-11-13T15:12:30Z edited by claude-code: requirement
 
 - 2026-11-13T20:08:25Z claude-code: Implemented, ready for check: view transitions, tap feedback, skeletons, preloading, scroll restoration and three small fixes by opencode in worktree rss-reader-wt-transitions (branch wt/transitions, committed, rebased on main); pnpm check/test pass; no browser/throttled measurements yet
+
+- 2026-11-13T20:13:35Z claude-code: Check failed: (1) pnpm test:mobile on wt/transitions: 6 failures (iphone+pixel) vs 26/26 pass on main. Row swipe tests (right marks read, left stars) fail: touch-action pan-y pinch-zoom on article-row (was touch-pan-y) stops CDP row swipes; with it reverted they pass. Article swipe test fails: touches in the first ~100-150 ms after the article heading appears (list->article view transition window) are ignored; a swipe started right after heading visible does not navigate, waiting 150 ms does. (2) README has a stray merge marker line "||||||| parent of 0fd73ac (...)" above the Mobile performance budget heading. pnpm check and pnpm test (473) pass. Not verified further (CLS, TTFP, traces, screenshots) because of the regressions.
+
+- 2026-11-13T20:20:15Z claude-code: Implemented, ready for check: fixed gesture blocking during view transition (only outgoing snapshot animates), restored touch-pan-y on rows, removed README marker; pnpm check/test (501) and test:mobile 26/26 pass; committed on wt/transitions

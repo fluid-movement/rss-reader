@@ -1,3 +1,3 @@
-- [ ] List-to-article and article-to-list transitions use view transitions (with a fallback and reduced-motion handling) without layout shift, verified in Chromium emulation and screenshots/recordings
-- [ ] Tapping an article shows pressed feedback immediately and a skeleton or preloaded content, measured as time to first article paint on a throttled profile before and after
-- [ ] Gestures and transitions stay at 60 fps on a 4x CPU slowdown (trace evidence) and scroll restoration is correct; pnpm check and pnpm test pass
+- [x] List-to-article and article-to-list transitions use view transitions (with a fallback and reduced-motion handling) without layout shift, verified in Chromium emulation and screenshots/recordings
+- [x] Tapping an article shows pressed feedback immediately and a skeleton or preloaded content, measured as time to first article paint on a throttled profile before and after
+- [x] Gestures and transitions stay at 60 fps on a 4x CPU slowdown (trace evidence) and scroll restoration is correct; pnpm check and pnpm test pass
