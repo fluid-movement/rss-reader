@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>RSS fixture</title><link>https://example.com/</link><description>Test feed</description>
+    <item><guid>rss-1</guid><title>First story</title><link>https://example.com/one</link><dc:creator>Ada</dc:creator><pubDate>Fri, 13 Nov 2026 09:00:00 GMT</pubDate><description>Summary</description><content:encoded><![CDATA[<p>Hello <strong>reader</strong></p><script>alert(1)</script><img src="https://example.com/image.png" onerror="alert(1)"><a href="javascript:alert(1)">bad</a>]]></content:encoded></item>
+    <item><title>No GUID</title><link>https://example.com/two</link><description>Second story</description></item>
+    <item><title>No link either</title><description>Stable content</description></item>
+  </channel>
+</rss>

@@ -1,0 +1,22 @@
+{
+	"version": "https://jsonfeed.org/version/1.1",
+	"title": "JSON fixture",
+	"home_page_url": "https://example.com/",
+	"items": [
+		{
+			"id": "json-1",
+			"url": "/json-story",
+			"title": "JSON story",
+			"content_html": "<p>JSON content</p><iframe src='https://evil.example/'></iframe>",
+			"summary": "JSON summary",
+			"authors": [{ "name": "Lin" }],
+			"date_published": "2026-11-13T09:00:00Z"
+		},
+		{
+			"id": "json-2",
+			"title": "Plain text",
+			"content_text": "Use <script> & enjoy",
+			"date_published": "not-a-date"
+		}
+	]
+}

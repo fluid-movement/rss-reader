@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atom fixture</title><id>https://example.com/atom</id><link href="https://example.com/"/><updated>2026-11-13T09:00:00Z</updated>
+  <entry><id>atom-1</id><title>Atom story</title><link rel="alternate" href="https://example.com/atom-story"/><author><name>Grace</name></author><published>2026-11-12T12:00:00Z</published><updated>2026-11-13T09:00:00Z</updated><content type="html">&lt;p&gt;Atom content&lt;/p&gt;</content><summary>Atom summary</summary></entry>
+</feed>
