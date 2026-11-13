@@ -1,3 +1,3 @@
 - [ ] Manifest, icons and service worker make the app installable on Chrome and iOS
-- [ ] Lighthouse PWA installability passes
+- [x] Lighthouse PWA installability passes
 - [x] No stale-data bugs from service worker caching of API responses
