@@ -1,5 +1,4 @@
 <script lang="ts">
-	/* eslint svelte/no-navigation-without-resolve: off -- Dynamic links and future issue routes append to the resolved app root; existing routes use resolve directly. */
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { enhance, type SubmitFunction } from '$app/forms';
@@ -9,13 +8,14 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import type { ShellData } from '#lib/reader.ts';
+	import { unreadDelta } from '#lib/reader-state.svelte.ts';
 	import {
 		Rss,
 		Inbox,
 		Mail,
 		Star,
 		Folder,
-		Plus,
+		Settings2,
 		Settings,
 		LogOut,
 		Sun,
@@ -50,11 +50,26 @@
 			}
 		};
 	};
-	const views = [
-		{ title: 'All articles', href: '/', icon: Inbox },
-		{ title: 'Unread', href: '/unread', icon: Mail },
-		{ title: 'Starred', href: '/starred', icon: Star }
-	];
+	// Unread counts: server counts per feed plus pending optimistic changes.
+	const feedUnread = (feedId: string) =>
+		Math.max(0, (data.unread[feedId] ?? 0) + unreadDelta(feedId));
+	const folderUnread = (folderId: string) =>
+		data.feeds.reduce(
+			(sum, feed) => (feed.folderId === folderId ? sum + feedUnread(feed.id) : sum),
+			0
+		);
+	const totalUnread = $derived(data.feeds.reduce((sum, feed) => sum + feedUnread(feed.id), 0));
+	const views = $derived([
+		{ title: 'All articles', href: '/', path: resolve('/(app)'), icon: Inbox, count: totalUnread },
+		{
+			title: 'Unread',
+			href: '/unread',
+			path: resolve('/(app)/unread'),
+			icon: Mail,
+			count: totalUnread
+		},
+		{ title: 'Starred', href: '/starred', path: resolve('/(app)/starred'), icon: Star, count: 0 }
+	]);
 	function active(href: string) {
 		return href === '/'
 			? page.url.pathname === '/' || page.url.pathname.startsWith('/item/')
@@ -71,7 +86,7 @@
 		>
 		<form
 			method="POST"
-			action={`${resolve('/feeds')}?/refreshAll`}
+			action={`${resolve('/(app)/feeds')}?/refreshAll`}
 			use:enhance={refreshAll}
 			aria-busy={refreshing}
 		>
@@ -96,11 +111,13 @@
 							><Sidebar.MenuButton isActive={active(view.href)}>
 								{#snippet child({ props })}<a
 										{...props}
-										href={`${resolve('/(app)').replace(/\/$/, '')}${view.href}`}
+										href={view.path}
 										aria-current={active(view.href) ? 'page' : undefined}
 										><view.icon /><span>{view.title}</span></a
 									>{/snippet}
-							</Sidebar.MenuButton></Sidebar.MenuItem
+							</Sidebar.MenuButton>{#if view.count > 0 && view.href !== '/starred'}<Sidebar.MenuBadge
+									>{view.count}</Sidebar.MenuBadge
+								>{/if}</Sidebar.MenuItem
 						>
 					{/each}
 				</Sidebar.Menu>
@@ -119,7 +136,9 @@
 											aria-current={active(href) ? 'page' : undefined}
 											><Folder /><span>{folder.name}</span></a
 										>{/snippet}</Sidebar.MenuButton
-								>
+								>{#if folderUnread(folder.id) > 0}<Sidebar.MenuBadge
+										>{folderUnread(folder.id)}</Sidebar.MenuBadge
+									>{/if}
 								<Sidebar.MenuSub>
 									{#each data.feeds.filter((feed) => feed.folderId === folder.id) as feed (feed.id)}
 										<Sidebar.MenuSubItem
@@ -127,7 +146,11 @@
 												href={resolve('/(app)/feed/[id]', { id: feed.id })}
 												isActive={active(`/feed/${feed.id}`)}
 												aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
-												><Rss /><span>{feed.title}</span></Sidebar.MenuSubButton
+												><Rss /><span class="truncate">{feed.title}</span
+												>{#if feedUnread(feed.id) > 0}<span
+														class="ml-auto text-xs text-muted-foreground tabular-nums"
+														>{feedUnread(feed.id)}</span
+													>{/if}</Sidebar.MenuSubButton
 											></Sidebar.MenuSubItem
 										>
 									{/each}
@@ -143,15 +166,18 @@
 											aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
 											><Rss /><span>{feed.title}</span></a
 										>{/snippet}</Sidebar.MenuButton
-								></Sidebar.MenuItem
+								>{#if feedUnread(feed.id) > 0}<Sidebar.MenuBadge
+										>{feedUnread(feed.id)}</Sidebar.MenuBadge
+									>{/if}</Sidebar.MenuItem
 							>
 						{/each}
 						<Sidebar.MenuItem
-							><Sidebar.MenuButton
+							><Sidebar.MenuButton isActive={active('/feeds')}
 								>{#snippet child({ props })}<a
 										{...props}
-										href={`${resolve('/(app)').replace(/\/$/, '')}/feeds`}
-										><Plus /><span>Add feed</span></a
+										href={resolve('/(app)/feeds')}
+										aria-current={active('/feeds') ? 'page' : undefined}
+										><Settings2 /><span>Manage feeds</span></a
 									>{/snippet}</Sidebar.MenuButton
 							></Sidebar.MenuItem
 						>
@@ -164,19 +190,11 @@
 		<Sidebar.Menu>
 			<Sidebar.MenuItem
 				><Sidebar.MenuButton
-					>{#snippet child({ props })}<a
-							{...props}
-							href={`${resolve('/(app)').replace(/\/$/, '')}/feeds`}
-							><Rss /><span>Manage feeds</span></a
-						>{/snippet}</Sidebar.MenuButton
-				></Sidebar.MenuItem
-			>
-			<Sidebar.MenuItem
-				><Sidebar.MenuButton
-					>{#snippet child({ props })}<a
-							{...props}
-							href={`${resolve('/(app)').replace(/\/$/, '')}/settings`}
-							><Settings /><span>Settings</span></a
+					>{#snippet child({
+						props
+					})}<!-- Settings (a later issue) has no route yet, so resolve() cannot type it. -->
+						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+						<a {...props} href="/settings"><Settings /><span>Settings</span></a
 						>{/snippet}</Sidebar.MenuButton
 				></Sidebar.MenuItem
 			>

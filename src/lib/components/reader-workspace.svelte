@@ -1,20 +1,57 @@
 <script lang="ts">
-	/* eslint svelte/no-navigation-without-resolve: off -- Server-provided reader paths append to the resolved app root so nested views retain their route context. */
-	import { MediaQuery } from 'svelte/reactivity';
+	import { untrack } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ArrowLeft, ExternalLink, Share2, BookOpen, Rss } from '@lucide/svelte';
+	import {
+		ArrowLeft,
+		ExternalLink,
+		Share2,
+		BookOpen,
+		Rss,
+		Star,
+		Circle,
+		CheckCheck,
+		MailOpen,
+		Mail
+	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import * as Resizable from '#lib/components/ui/resizable/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { ScrollArea } from '#lib/components/ui/scroll-area/index.js';
 	import { shareArticle } from '#lib/share.ts';
+	import { itemHref, listHref } from '#lib/reader-paths.ts';
+	import { isRead, isStarred, markViewRead, updateArticle } from '#lib/reader-state.svelte.ts';
 	import type { ReaderData } from '#lib/reader.ts';
 	let { data }: { data: ReaderData } = $props();
-	const desktop = new MediaQuery('(min-width: 1024px)', false);
 	let sharing = $state(false);
+	let cameFromList = $state(false);
 	let original = $derived(safeLink(data.selectedItem?.link));
+	let backHref = $derived(listHref(data));
+	let unreadInView = $derived(data.articles.filter((article) => !isRead(article)).length);
+
+	afterNavigate(({ from, type }) => {
+		// Only when the previous history entry is known to be this view's list.
+		cameFromList = (type === 'link' || type === 'goto') && !!from && from.url.pathname === backHref;
+	});
+
+	// Opening an article in the reader marks it read once; scrolling the list never does.
+	let autoMarked = '';
+	$effect(() => {
+		const selected = data.selectedItem;
+		if (!selected || autoMarked === selected.id) return;
+		autoMarked = selected.id;
+		untrack(() => {
+			if (!isRead(selected)) void updateArticle(selected, { read: true });
+		});
+	});
+
+	function goBack(event: MouseEvent) {
+		if (!cameFromList) return;
+		event.preventDefault();
+		history.back();
+	}
 	function safeLink(link: string | null | undefined) {
 		if (!link) return null;
 		try {
@@ -31,6 +68,13 @@
 			year: 'numeric',
 			timeZone: 'UTC'
 		}).format(date);
+	}
+	async function markAll(olderThanDays?: number) {
+		const ok = await markViewRead(data, data.articles, olderThanDays);
+		if (ok)
+			toast.success(
+				olderThanDays === undefined ? 'Marked all as read' : 'Marked older articles as read'
+			);
 	}
 	async function share() {
 		if (!original || !data.selectedItem || sharing) return;
@@ -54,36 +98,69 @@
 
 {#snippet articleList()}
 	<section aria-label={data.viewTitle} class="flex h-full min-w-0 flex-col">
-		<header class="flex h-16 shrink-0 items-center border-b px-5">
+		<header class="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-5">
 			<h1 class="truncate text-lg font-semibold tracking-tight">{data.viewTitle}</h1>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger
+					>{#snippet child({ props })}<Button
+							{...props}
+							variant="ghost"
+							size="sm"
+							disabled={unreadInView === 0}
+							aria-label="Mark as read options"
+							><CheckCheck data-icon="inline-start" />Mark read</Button
+						>{/snippet}</DropdownMenu.Trigger
+				>
+				<DropdownMenu.Content align="end">
+					<DropdownMenu.Item onSelect={() => markAll()}>Mark all as read</DropdownMenu.Item>
+					<DropdownMenu.Separator />
+					<DropdownMenu.Item onSelect={() => markAll(1)}>Older than 1 day</DropdownMenu.Item>
+					<DropdownMenu.Item onSelect={() => markAll(7)}>Older than 1 week</DropdownMenu.Item>
+					<DropdownMenu.Item onSelect={() => markAll(30)}>Older than 1 month</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
 		</header>
 		<ScrollArea class="min-h-0 flex-1">
 			{#if data.articles.length}
 				<Item.Group class="min-w-0 p-2">
 					{#each data.articles as article (article.id)}
+						{@const read = isRead(article)}
 						<Item.Root
 							variant={data.selectedItem?.id === article.id ? 'muted' : 'default'}
 							size="sm"
 							role="listitem"
 						>
 							{#snippet child({ props })}
+								<!-- eslint-disable svelte/no-navigation-without-resolve -- itemHref() wraps resolve() for the per-view item route. -->
 								<a
 									{...props}
-									href={`${resolve('/(app)').replace(/\/$/, '')}${data.listPath === '/' ? '' : data.listPath}/item/${article.id}`}
+									href={itemHref(data, article.id)}
 									aria-current={data.selectedItem?.id === article.id ? 'page' : undefined}
 								>
 									<Item.Content>
 										<div
 											class="flex items-center justify-between gap-3 text-xs text-muted-foreground"
 										>
-											<span class="truncate">{article.feedTitle}</span
-											>{#if article.publishedAt}<time
-													class="shrink-0"
-													datetime={article.publishedAt.toISOString()}
-													>{dateLabel(article.publishedAt)}</time
-												>{/if}
+											<span class="flex min-w-0 items-center gap-1.5">
+												{#if !read}<Circle
+														class="size-2 shrink-0 fill-primary text-primary"
+														aria-label="Unread"
+													/>{/if}
+												<span class="truncate">{article.feedTitle}</span>
+											</span>
+											<span class="flex shrink-0 items-center gap-2">
+												{#if isStarred(article)}<Star
+														class="size-3.5 fill-current text-amber-500"
+														aria-label="Starred"
+													/>{/if}
+												{#if article.publishedAt}<time datetime={article.publishedAt.toISOString()}
+														>{dateLabel(article.publishedAt)}</time
+													>{/if}
+											</span>
 										</div>
-										<Item.Title>
+										<Item.Title
+											class={read ? 'font-normal text-muted-foreground' : 'font-semibold'}
+										>
 											{article.title}
 										</Item.Title>
 										{#if article.summary}<Item.Description>
@@ -91,6 +168,7 @@
 											</Item.Description>{/if}
 									</Item.Content>
 								</a>
+								<!-- eslint-enable svelte/no-navigation-without-resolve -->
 							{/snippet}
 						</Item.Root>
 					{/each}
@@ -106,7 +184,7 @@
 								: 'Add your first feed to start following the sites you love.'}</Empty.Description
 						></Empty.Header
 					>{#if !data.hasFeeds}<Empty.Content
-							><Button href="/feeds">Add a feed</Button></Empty.Content
+							><Button href={resolve('/(app)/feeds')}>Add a feed</Button></Empty.Content
 						>{/if}</Empty.Root
 				>
 			{/if}
@@ -116,16 +194,33 @@
 
 {#snippet reader()}
 	{#if data.selectedItem}
+		{@const selected = data.selectedItem}
 		<section aria-label="Article reader" class="flex h-full min-w-0 flex-col">
 			<header
 				class="flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-2"
 			>
-				<Button
-					href={`${resolve('/(app)').replace(/\/$/, '')}${data.listPath}`}
-					variant="ghost"
-					size="sm"><ArrowLeft data-icon="inline-start" />Back to {data.viewTitle}</Button
+				<Button href={backHref} onclick={goBack} variant="ghost" size="sm"
+					><ArrowLeft data-icon="inline-start" />Back to {data.viewTitle}</Button
 				>
 				<div class="flex items-center gap-1">
+					<Button
+						variant="ghost"
+						size="sm"
+						aria-pressed={isStarred(selected)}
+						onclick={() => updateArticle(selected, { starred: !isStarred(selected) })}
+						><Star
+							data-icon="inline-start"
+							class={isStarred(selected) ? 'fill-current text-amber-500' : ''}
+						/>{isStarred(selected) ? 'Starred' : 'Star'}</Button
+					>
+					<Button
+						variant="ghost"
+						size="sm"
+						onclick={() => updateArticle(selected, { read: !isRead(selected) })}
+						>{#if isRead(selected)}<Mail data-icon="inline-start" />Mark unread{:else}<MailOpen
+								data-icon="inline-start"
+							/>Mark read{/if}</Button
+					>
 					{#if original}<Button
 							href={original}
 							target="_blank"
@@ -175,19 +270,19 @@
 	{/if}
 {/snippet}
 
-{#if desktop.current}
-	<Resizable.PaneGroup direction="horizontal">
-		<Resizable.Pane defaultSize={35} minSize={25} maxSize={55}
-			>{@render articleList()}</Resizable.Pane
-		>
-		<Resizable.Handle />
-		<Resizable.Pane defaultSize={65} minSize={35}>{@render reader()}</Resizable.Pane>
-	</Resizable.PaneGroup>
-{:else if data.selectedItem}
-	{@render reader()}
-{:else}
-	{@render articleList()}
-{/if}
+<!-- Both panes render once; CSS picks which is visible so SSR/first paint match the viewport. -->
+<div class="flex h-full min-w-0">
+	<div
+		class="h-full min-w-0 flex-1 lg:w-[22rem] lg:max-w-md lg:flex-none lg:border-r xl:w-[26rem] {data.selectedItem
+			? 'hidden lg:block'
+			: ''}"
+	>
+		{@render articleList()}
+	</div>
+	<div class="h-full min-w-0 flex-1 {data.selectedItem ? '' : 'hidden lg:block'}">
+		{@render reader()}
+	</div>
+</div>
 
 <style>
 	.article-prose {
