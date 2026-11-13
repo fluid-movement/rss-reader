@@ -1,4 +1,4 @@
-- [ ] All, Unread, Starred, folder and feed views show correct unread counts
-- [ ] Read, unread, star, mark all read and mark older than N work and persist in the DB
-- [ ] UI updates optimistically and rolls back on failure
-- [ ] State from one client appears on another after refocus
+- [x] All, Unread, Starred, folder and feed views show correct unread counts
+- [x] Read, unread, star, mark all read and mark older than N work and persist in the DB
+- [x] UI updates optimistically and rolls back on failure
+- [x] State from one client appears on another after refocus

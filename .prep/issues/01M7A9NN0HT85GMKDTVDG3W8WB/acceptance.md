@@ -1,0 +1,6 @@
+- [ ] Opening an article or returning from it keeps the list scroll position on desktop and phone (verified in a browser)
+- [ ] Views load a bounded number of items with a way to load more, the open item stays in the list, and polls do not refetch full lists unnecessarily
+- [ ] /api/state rejects oversized bodies and out-of-range olderThanDays with 4xx and tests
+- [ ] Starred count is either shown correctly or the dead field is removed
+- [ ] Sidebar footer no longer clips the last row at 800 px height; folder and feed badges are consistent
+- [ ] Optimistic updates, rollback, and cross-client sync still work (browser-verified); pnpm check and pnpm test pass
