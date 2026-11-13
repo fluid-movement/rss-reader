@@ -3,7 +3,10 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { BookOpen, Rss, Search, Star, Circle, CheckCheck } from '@lucide/svelte';
+	import { enhance, type SubmitFunction } from '$app/forms';
+	import { BookOpen, Rss, Search, Star, Circle, CheckCheck, TriangleAlert } from '@lucide/svelte';
+	import * as Alert from '#lib/components/ui/alert/index.js';
+	import { feedFailure } from '#lib/reader.ts';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
@@ -15,7 +18,13 @@
 	import { setReaderShortcutContext } from '#lib/shortcut-handler.svelte.ts';
 	import { EXTRA_PAGE_SIZE, loadChunked, withOpenArticle } from '#lib/reader-list.ts';
 	import { isRead, isStarred, markViewRead } from '#lib/reader-state.svelte.ts';
-	import type { ArticlePreview, HighlightSegment, ReaderData, ReaderItem } from '#lib/reader.ts';
+	import type {
+		ArticlePreview,
+		HighlightSegment,
+		ReaderData,
+		ReaderItem,
+		ShellData
+	} from '#lib/reader.ts';
 	let {
 		data,
 		children
@@ -27,6 +36,43 @@
 
 	let itemId = $derived(page.params.itemId);
 	let selectedItem = $derived((page.data as { selectedItem?: ReaderItem }).selectedItem);
+	let failure = $derived(
+		data.view === 'feed'
+			? feedFailure(
+					(page.data as Pick<ShellData, 'feeds'>).feeds?.find((feed) => feed.id === data.viewId)
+				)
+			: null
+	);
+	let retrying = $state(false);
+	const retry: SubmitFunction = ({ cancel }) => {
+		if (retrying) {
+			cancel();
+			return;
+		}
+		retrying = true;
+		return async ({ result, update }) => {
+			try {
+				if (result.type === 'error') {
+					toast.error('Could not refresh. Try again.');
+					return;
+				}
+				if ((result.type === 'success' || result.type === 'failure') && result.data?.message) {
+					const message = String(result.data.message);
+					if (
+						result.type === 'failure' ||
+						result.data.success === false ||
+						message.includes('refresh failed')
+					)
+						toast.error(message);
+					else if (message === 'Refreshed recently, try again in a moment.') toast.info(message);
+					else toast.success(message);
+				}
+				await update({ navigate: false, refreshAll: true, reset: false });
+			} finally {
+				retrying = false;
+			}
+		};
+	};
 
 	// Pages loaded beyond the layout's first page. They are refetched alongside it on sync.
 	let extras = $state<ArticlePreview[]>([]);
@@ -208,6 +254,28 @@
 					</DropdownMenu.Root>{/if}
 			</header>
 			<ScrollArea class="min-h-0 flex-1">
+				{#if failure}
+					<div class="p-3">
+						<Alert.Root variant="destructive">
+							<TriangleAlert />
+							<Alert.Title>Could not refresh feed</Alert.Title>
+							<Alert.Description class="min-w-0">
+								<p class="[overflow-wrap:anywhere]">{failure}</p>
+								<form
+									method="POST"
+									action={`${resolve('/(app)/feeds')}?/refreshFeed`}
+									use:enhance={retry}
+									aria-busy={retrying}
+								>
+									<input type="hidden" name="feedId" value={data.viewId} />
+									<Button type="submit" variant="outline" size="sm" disabled={retrying}
+										>{retrying ? 'Retrying…' : 'Retry'}</Button
+									>
+								</form>
+							</Alert.Description>
+						</Alert.Root>
+					</div>
+				{/if}
 				{#if articles.length}
 					<Item.Group class="min-w-0 p-2" bind:ref={listElement}>
 						{#each articles as article (article.id)}

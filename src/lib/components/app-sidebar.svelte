@@ -4,11 +4,13 @@
 	import { enhance, type SubmitFunction } from '$app/forms';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import SearchBox from '#lib/components/search-box.svelte';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import type { ShellData } from '#lib/reader.ts';
+	import { feedFailure } from '#lib/reader.ts';
 	import { unreadDelta } from '#lib/reader-state.svelte.ts';
 	import {
 		Rss,
@@ -21,7 +23,8 @@
 		LogOut,
 		Sun,
 		Moon,
-		Monitor
+		Monitor,
+		TriangleAlert
 	} from '@lucide/svelte';
 	let { data }: { data: ShellData } = $props();
 	// Folder, feed and view badges share one muted style.
@@ -92,6 +95,15 @@
 	}
 </script>
 
+{#snippet feedIcon(feed: ShellData['feeds'][number])}
+	{#if feedFailure(feed)}
+		<TriangleAlert class="text-destructive" aria-hidden="true" />
+		<span class="sr-only">Feed failing: {feedFailure(feed)}</span>
+	{:else}
+		<Rss />
+	{/if}
+{/snippet}
+
 <Sidebar.Root collapsible="none" class="w-full">
 	<Sidebar.Header class="p-4">
 		<a
@@ -160,16 +172,25 @@
 								<Sidebar.MenuSub>
 									{#each data.feeds.filter((feed) => feed.folderId === folder.id) as feed (feed.id)}
 										<Sidebar.MenuSubItem
-											><Sidebar.MenuSubButton
-												href={resolve('/(app)/feed/[id]', { id: feed.id })}
-												isActive={active(`/feed/${feed.id}`)}
-												aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
-												><Rss /><span class="truncate">{feed.title}</span
-												>{#if feedUnread(feed.id) > 0}<span
-														class="ml-auto text-xs text-muted-foreground tabular-nums"
-														>{feedUnread(feed.id)}</span
-													>{/if}</Sidebar.MenuSubButton
-											></Sidebar.MenuSubItem
+											><Tooltip.Root disabled={!feedFailure(feed)}>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}<Sidebar.MenuSubButton
+															{...props}
+															href={resolve('/(app)/feed/[id]', { id: feed.id })}
+															isActive={active(`/feed/${feed.id}`)}
+															aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
+															>{@render feedIcon(feed)}<span class="truncate">{feed.title}</span
+															>{#if feedUnread(feed.id) > 0}<span
+																	class="ml-auto text-xs text-muted-foreground tabular-nums"
+																	>{feedUnread(feed.id)}</span
+																>{/if}</Sidebar.MenuSubButton
+														>{/snippet}
+												</Tooltip.Trigger>
+												{#if feedFailure(feed)}<Tooltip.Content
+														role="tooltip"
+														class="max-w-64 break-words">{feedFailure(feed)}</Tooltip.Content
+													>{/if}
+											</Tooltip.Root></Sidebar.MenuSubItem
 										>
 									{/each}
 								</Sidebar.MenuSub>
@@ -177,14 +198,24 @@
 						{/each}
 						{#each data.feeds.filter((feed) => !feed.folderId) as feed (feed.id)}
 							<Sidebar.MenuItem
-								><Sidebar.MenuButton isActive={active(`/feed/${feed.id}`)}
-									>{#snippet child({ props })}<a
-											{...props}
-											href={resolve('/(app)/feed/[id]', { id: feed.id })}
-											aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
-											><Rss /><span>{feed.title}</span></a
-										>{/snippet}</Sidebar.MenuButton
-								>{#if feedUnread(feed.id) > 0}<Sidebar.MenuBadge class={badgeClass}
+								><Tooltip.Root disabled={!feedFailure(feed)}>
+									<Tooltip.Trigger>
+										{#snippet child({ props: tooltipProps })}<Sidebar.MenuButton
+												isActive={active(`/feed/${feed.id}`)}
+												>{#snippet child({ props })}<a
+														{...props}
+														{...tooltipProps}
+														href={resolve('/(app)/feed/[id]', { id: feed.id })}
+														aria-current={active(`/feed/${feed.id}`) ? 'page' : undefined}
+														>{@render feedIcon(feed)}<span>{feed.title}</span></a
+													>{/snippet}</Sidebar.MenuButton
+											>{/snippet}
+									</Tooltip.Trigger>
+									{#if feedFailure(feed)}<Tooltip.Content
+											role="tooltip"
+											class="max-w-64 break-words">{feedFailure(feed)}</Tooltip.Content
+										>{/if}
+								</Tooltip.Root>{#if feedUnread(feed.id) > 0}<Sidebar.MenuBadge class={badgeClass}
 										>{feedUnread(feed.id)}</Sidebar.MenuBadge
 									>{/if}</Sidebar.MenuItem
 							>

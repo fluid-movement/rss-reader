@@ -55,10 +55,23 @@ export type ReaderItemData = ReaderData & { selectedItem: ReaderItem };
 
 export interface ShellData {
 	user: { name: string; email: string };
-	feeds: { id: string; title: string; folderId: string | null }[];
+	feeds: {
+		id: string;
+		title: string;
+		folderId: string | null;
+		errorCount: number;
+		lastError: string | null;
+	}[];
 	/** Total starred articles. */
 	starred: number;
 	/** Unread item count per feed id (feeds with none are absent). */
 	unread: Record<string, number>;
 	folders: { id: string; name: string }[];
+}
+
+/** Match the broken-feed threshold on Manage feeds; only return safe stored text. */
+export function feedFailure(feed: { errorCount: number; lastError: string | null } | undefined) {
+	return feed && feed.errorCount >= 3
+		? feed.lastError || 'Could not fetch this feed. Try again.'
+		: null;
 }

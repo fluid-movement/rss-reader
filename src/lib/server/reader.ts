@@ -86,7 +86,13 @@ export function getShellData(db: AppDatabase, userId: string) {
 		unread: getUnreadCounts(db, userId),
 		starred: getStarredCount(db, userId),
 		feeds: db
-			.select({ id: feeds.id, title: feeds.title, folderId: feeds.folderId })
+			.select({
+				id: feeds.id,
+				title: feeds.title,
+				folderId: feeds.folderId,
+				errorCount: feeds.errorCount,
+				lastError: feeds.lastError
+			})
 			.from(feeds)
 			.where(eq(feeds.userId, userId))
 			.orderBy(asc(feeds.title))

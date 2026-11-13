@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { connectDatabase } from './db/connect';
 import { migrateDatabase } from './db/migrate';
 import { feeds, folders, items, itemState, user } from './db/schema';
@@ -75,6 +76,34 @@ describe('user-scoped reader queries', () => {
 		const shell = getShellData(connection.db, 'owner');
 		expect(shell.feeds.map((feed) => feed.id)).toEqual(['second', 'feed']);
 		expect(shell.folders.map((folder) => folder.id)).toEqual(['folder']);
+	});
+	it('includes safe failure metadata without changing exact counts or leaking other feeds', () => {
+		const db = connection.db;
+		db.update(feeds)
+			.set({ errorCount: 3, lastError: 'Remote server returned HTTP 404.' })
+			.where(eq(feeds.id, 'feed'))
+			.run();
+		db.update(feeds)
+			.set({ errorCount: 5, lastError: 'Other user error' })
+			.where(eq(feeds.id, 'private-feed'))
+			.run();
+		db.insert(itemState)
+			.values({ userId: 'owner', itemId: 'article', starredAt: new Date() })
+			.run();
+		const shell = getShellData(db, 'owner');
+		expect(shell.feeds).toEqual([
+			{ id: 'second', title: 'Another', folderId: null, errorCount: 0, lastError: null },
+			{
+				id: 'feed',
+				title: 'Journal',
+				folderId: 'folder',
+				errorCount: 3,
+				lastError: 'Remote server returned HTTP 404.'
+			}
+		]);
+		expect(shell.unread).toEqual({ feed: 1, second: 1 });
+		expect(shell.starred).toBe(1);
+		expect(getReaderData(db, 'owner', { view: 'feed', id: 'feed' }).articles).toHaveLength(1);
 	});
 	it('lists newest articles and loads sanitized full content with metadata', () => {
 		const data = getReaderData(connection.db, 'owner', { view: 'all' });
