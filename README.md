@@ -144,10 +144,10 @@ The Debian slim multi-stage image contains only production dependencies, includi
 Create the first user from a trusted administrator console after deployment (replace `<container>` with the running container's name or ID):
 
 ```sh
-docker exec <container> pnpm user:create --email reader@example.com --name 'Reader' --password 'a-long-unique-password'
+docker exec <container> node --import tsx scripts/create-user.ts --email reader@example.com --name 'Reader' --password 'a-long-unique-password'
 ```
 
-The command inherits the container environment; no `.env` file is included in the image. It applies migrations and writes to the same mounted database. Public sign-up remains disabled. Command-line passwords may be visible in shell history/process listings. Retention is a per-user database setting, defaulting to **30 days**, not an environment variable.
+The command runs the script directly with the bundled `tsx` loader rather than `pnpm user:create`, because pnpm cannot download or write its cache as the non-root user at runtime. It inherits the container environment; no `.env` file is included in the image. It applies migrations and writes to the same mounted database. Public sign-up remains disabled. Command-line passwords may be visible in shell history/process listings. Retention is a per-user database setting, defaulting to **30 days**, not an environment variable.
 
 ### Local container smoke test
 
@@ -156,7 +156,7 @@ Copy `.env.example` to `.env`, set `BETTER_AUTH_SECRET`, and set `ORIGIN=http://
 ```sh
 docker compose up --build -d --wait
 curl --fail http://localhost:5311/health
-docker compose exec app pnpm user:create --email reader@example.com --name 'Reader' --password 'a-long-unique-password'
+docker compose exec app node --import tsx scripts/create-user.ts --email reader@example.com --name 'Reader' --password 'a-long-unique-password'
 docker compose down
 ```
 
