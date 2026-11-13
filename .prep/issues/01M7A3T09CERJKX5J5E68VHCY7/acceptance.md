@@ -1,3 +1,3 @@
-- [ ] FTS5 search returns only the current user's items
-- [ ] Pruning removes only read, unstarred items older than the retention setting
-- [ ] Tests cover search and pruning
+- [x] FTS5 search returns only the current user's items
+- [x] Pruning removes only read, unstarred items older than the retention setting
+- [x] Tests cover search and pruning

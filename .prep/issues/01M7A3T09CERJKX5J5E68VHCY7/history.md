@@ -1,1 +1,3 @@
 - 2026-11-13T09:28:57Z edited by claude-code: depends_on
+
+- 2026-11-13T12:01:50Z claude-code: Implemented by sonnet; review by separate sonnet (real browser, 2-user isolation, fuzzed queries, 50k/100k scale tests): FAIL on a Docker blocker (search-text.ts not copied for user:create), fixed + proven from a runtime-stage scratch copy; spoofable highlight markers fixed; docs for drizzle-kit hazards; db:migrate/db:push now refuse. Rebased onto extraction work (tombstones inside ingestItemIds, stop() clears timers/aborts extraction); final merge verified by orchestrator (no second review: Claude 5h usage at 95%). Latency: ~100ms per search at 50k items with very common terms, documented.
