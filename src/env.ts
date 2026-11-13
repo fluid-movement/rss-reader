@@ -2,6 +2,10 @@ import { defineEnvVars } from '@sveltejs/kit/env';
 
 export const variables = defineEnvVars({
 	DATABASE_URL: { description: 'The database connection string.' },
+	RSS_READER_CONTACT: {
+		description: 'Project URL or contact included in the feed fetcher User-Agent.',
+		schema: (value) => value?.trim() || 'https://github.com/fluid-movement/rss-reader'
+	},
 	ORIGIN: {
 		description: 'The app origin (base URL), e.g. `http://localhost:5173`.'
 	},

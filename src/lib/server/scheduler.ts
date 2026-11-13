@@ -29,7 +29,8 @@ export function createScheduler(db: AppDatabase) {
 	let stopping = new AbortController();
 	const extractions = new Set<Promise<void>>();
 	const batches = new Map<string, Promise<RefreshSummary>>();
-	const queue: Array<() => void> = [];
+	const queue: Array<{ host: string; run: () => void }> = [];
+	const activeHosts = new Map<string, number>();
 	let active = 0;
 	let timer: ReturnType<typeof setInterval> | undefined;
 	let ticking: Promise<void> | undefined;
@@ -37,7 +38,12 @@ export function createScheduler(db: AppDatabase) {
 	let retentionFirst: ReturnType<typeof setTimeout> | undefined;
 	let pruning: Promise<unknown> | undefined;
 	function drain() {
-		while (active < 4 && queue.length) queue.shift()!();
+		while (active < 4 && queue.length) {
+			// Skip saturated hosts so they cannot block unrelated feeds behind them.
+			const index = queue.findIndex(({ host }) => (activeHosts.get(host) ?? 0) < 2);
+			if (index < 0) break;
+			queue.splice(index, 1)[0].run();
+		}
 	}
 	function pruneManualAttempts() {
 		const cutoff = Date.now() - MANUAL_COOLDOWN;
@@ -134,16 +140,24 @@ export function createScheduler(db: AppDatabase) {
 			manualAttempts.set(feedId, Date.now());
 		}
 		// Reserve before draining so overlapping batches cannot enqueue the same feed.
+		const host = new URL(feed.url).hostname;
 		const work = new Promise<RefreshResult>((resolve, reject) => {
-			queue.push(() => {
-				active++;
-				void fetchFeed(feedId)
-					.finally(() => {
-						active--;
-						running.delete(feedId);
-						drain();
-					})
-					.then(resolve, reject);
+			queue.push({
+				host,
+				run: () => {
+					active++;
+					activeHosts.set(host, (activeHosts.get(host) ?? 0) + 1);
+					void fetchFeed(feedId)
+						.finally(() => {
+							active--;
+							const remaining = activeHosts.get(host)! - 1;
+							if (remaining) activeHosts.set(host, remaining);
+							else activeHosts.delete(host);
+							running.delete(feedId);
+							drain();
+						})
+						.then(resolve, reject);
+				}
 			});
 		});
 		running.set(feedId, work);

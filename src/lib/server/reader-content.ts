@@ -1,4 +1,5 @@
 import sanitizeHtml from 'sanitize-html';
+import { replaceEmbeds } from './feeds/replace-embeds';
 
 /** Only absolute web links can become reader actions or shared URLs. */
 export function webUrl(value: string | null | undefined): string | null {
@@ -14,7 +15,7 @@ export function webUrl(value: string | null | undefined): string | null {
 /** The database is not a trust boundary: sanitize at the reader's server boundary. */
 export function sanitizeArticle(content: string | null, baseUrl?: string | null): string {
 	const base = webUrl(baseUrl);
-	return sanitizeHtml(content ?? '', {
+	return sanitizeHtml(replaceEmbeds(content ?? '', base), {
 		allowedTags: [...sanitizeHtml.defaults.allowedTags, 'img', 'figure', 'figcaption'],
 		allowedAttributes: {
 			a: ['href', 'title', 'rel'],

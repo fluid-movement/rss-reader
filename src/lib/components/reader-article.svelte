@@ -333,7 +333,7 @@
 		}}
 	/>{/if}
 
-<svelte:head><title>{selected.title} — {data.viewTitle} · RSS Reader</title></svelte:head>
+<svelte:head><title>{selected.title} · RSS Reader</title></svelte:head>
 
 <style>
 	.reader-toolbar {

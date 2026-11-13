@@ -225,7 +225,7 @@ describe('refresh scheduler', () => {
 		});
 	});
 	it('shares a global four-worker queue and feed locks across overlapping ticks and manual batches', async () => {
-		for (let i = 0; i < 9; i++) add(String(i));
+		for (let i = 0; i < 9; i++) add(String(i), { url: `https://host${i % 3}.example/${i}` });
 		let active = 0;
 		let peak = 0;
 		vi.mocked(safeFetch).mockImplementation(async () => {
@@ -244,6 +244,32 @@ describe('refresh scheduler', () => {
 		await Promise.all([first, second, all, duplicate, one]);
 		expect(peak).toBe(4);
 		expect(safeFetch).toHaveBeenCalledTimes(9);
+	});
+	it('caps each hostname at two across ports/protocols, skips blocked hosts, and releases slots on failure', async () => {
+		for (let i = 0; i < 6; i++)
+			add(`same${i}`, { url: `${i % 2 ? 'http' : 'https'}://same.example:${8000 + i}/rss` });
+		for (let i = 0; i < 4; i++) add(`other${i}`, { url: `https://other.example/${i}` });
+		const active = new Map<string, number>();
+		const peaks = new Map<string, number>();
+		vi.mocked(safeFetch).mockImplementation(async (input) => {
+			const url = new URL(input);
+			const host = url.hostname;
+			active.set(host, (active.get(host) ?? 0) + 1);
+			peaks.set(host, Math.max(peaks.get(host) ?? 0, active.get(host)!));
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			active.set(host, active.get(host)! - 1);
+			if (url.port === '8000') throw new FeedFetchError('Unavailable');
+			return response(304);
+		});
+		const tick = scheduler.tick();
+		const manual = scheduler.refreshAll('owner');
+		expect(safeFetch).toHaveBeenCalledTimes(4);
+		expect([...active.values()]).toEqual([2, 2]);
+		await vi.runAllTimersAsync();
+		await tick;
+		expect(await manual).toEqual({ refreshed: 9, failed: 1, skipped: 0 });
+		expect([...peaks.values()]).toEqual([2, 2]);
+		expect(safeFetch).toHaveBeenCalledTimes(10);
 	});
 	it('scopes manual batches, checks ownership even while running, and rate limits repeat requests', async () => {
 		add('mine');

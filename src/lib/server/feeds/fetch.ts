@@ -7,6 +7,19 @@ import { pipeline } from 'node:stream/promises';
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
 import ipaddr from 'ipaddr.js';
 
+let configuredContact: string | undefined;
+
+/** Supply SvelteKit's runtime env (including .env in dev); Node scripts use process.env. */
+export function configureFeedContact(contact: string | undefined) {
+	configuredContact = contact;
+}
+
+export function feedUserAgent() {
+	// Also used by standalone Node scripts, outside SvelteKit's env modules.
+	const contact = (configuredContact ?? process.env.RSS_READER_CONTACT)?.trim();
+	return `RSSReader/1.0 (+${contact && /^[\x20-\x7e]+$/.test(contact) && !/[()]/.test(contact) ? contact : 'https://github.com/fluid-movement/rss-reader'})`;
+}
+
 export class FeedFetchError extends Error {}
 
 const NETWORK_CODES = new Set([
@@ -133,7 +146,7 @@ export async function safeFetch(
 								Accept:
 									'application/atom+xml, application/rss+xml, application/feed+json, application/xml, text/html, */*',
 								'Accept-Encoding': 'gzip, deflate, br',
-								'User-Agent': 'RSSReader/1.0',
+								'User-Agent': feedUserAgent(),
 								...options.headers
 							},
 							lookup: (_hostname, lookupOptions, callback) => {

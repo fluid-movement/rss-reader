@@ -8,6 +8,54 @@ const fixture = (name: string) =>
 const base = 'https://example.com/feed';
 
 describe('feed parsing and sanitization', () => {
+	it.each([
+		['real-alistapart-author.xml', 'Shrey Shah'],
+		['real-smashing-author.xml', 'Victor Yocco']
+	])('extracts a display name from %s', async (name, author) => {
+		expect((await parseFeed(fixture(name), base)).items[0].author).toBe(author);
+	});
+	it.each([
+		['<author>Ada Lovelace</author>', 'Ada Lovelace'],
+		['<dc:creator>Grace Hopper</dc:creator>', 'Grace Hopper'],
+		['<author>hello@smashingmagazine.com (Cosima Mielke)</author>', 'Cosima Mielke'],
+		[
+			'<author>by <a><strong>Ada</strong> Lovelace</a></author><dc:creator>by</dc:creator>',
+			'Ada Lovelace'
+		],
+		['<author><![CDATA[by <a>Ada &amp; Lin</a>]]></author>', 'Ada & Lin'],
+		['<author>hello@example.com</author><dc:creator>Grace Hopper</dc:creator>', 'Grace Hopper'],
+		['<author>by</author><dc:creator>by</dc:creator>', null],
+		['<author>hello@example.com</author>', null],
+		['<dc:creator>hello@example.com</dc:creator>', null],
+		['<author><![CDATA[hello&#64;example.com]]></author>', null],
+		['<author><![CDATA[Ada Lovelace <ada@example.com>]]></author>', 'Ada Lovelace']
+	])('normalizes author fields: %s', async (fields, author) => {
+		const feed = await parseFeed(
+			`<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><title>T</title><item><guid>1</guid>${fields}</item></channel></rss>`,
+			base
+		);
+		expect(feed.items[0].author).toBe(author);
+	});
+	it.each(['iframe', 'video'])(
+		'replaces %s with an inline safe original link, discarding the entire embed',
+		(tag) => {
+			const html = sanitizeContent(
+				`<p>Before</p><${tag} src="https://embed.example/x" onload="bad()"><source src="x"><a href="https://evil.example">Fallback</a></${tag}><p>After</p>`,
+				'https://example.com/story?a=1&b=2'
+			);
+			expect(html).toBe(
+				'<p>Before</p>Embedded content not shown. <a href="https://example.com/story?a=1&amp;b=2" rel="noopener noreferrer nofollow">Open original</a><p>After</p>'
+			);
+			expect(html).not.toMatch(/iframe|video|source|embed.example|evil.example|onload/);
+		}
+	);
+	it('does not manufacture unsafe original links for removed embeds', () => {
+		for (const url of [undefined, 'javascript:alert(1)', 'https://user:pass@example.com/']) {
+			expect(sanitizeContent('<iframe src="https://embed.example"></iframe>', url)).toBe(
+				'Embedded content not shown.'
+			);
+		}
+	});
 	it('normalizes RSS 2, sanitizes rich HTML and uses link/hash fallback IDs', async () => {
 		const feed = await parseFeed(fixture('rss.xml'), base);
 		expect(feed.title).toBe('RSS fixture');
@@ -41,7 +89,8 @@ describe('feed parsing and sanitization', () => {
 			guid: 'json-1',
 			author: 'Lin',
 			link: 'https://example.com/json-story',
-			content: '<p>JSON content</p>'
+			content:
+				'<p>JSON content</p>Embedded content not shown. <a href="https://example.com/json-story" rel="noopener noreferrer nofollow">Open original</a>'
 		});
 		expect(feed.items[1].content).toBe('<p>Use &lt;script&gt; &amp; enjoy</p>');
 		expect(feed.items[1].publishedAt).toBeNull();
@@ -139,6 +188,9 @@ describe('real-world title entities', () => {
 		expect(await t('CO&lt;sub&gt;2&lt;/sub&gt; &amp;amp; H2O')).toBe('CO2 & H2O');
 		expect(await t('Using &amp;lt;div&amp;gt; &amp;amp; more')).toBe('Using <div> & more');
 		expect(await t('&lt;img src=x&gt;')).toBe('Untitled');
+		for (const title of ['if a&lt;b then c', 'a &lt; b', 'a &lt;3 b', 'a &lt;']) {
+			expect(await t(title)).toBe(title.replace(/&lt;/g, '<'));
+		}
 		const json = await parseFeed(
 			JSON.stringify({
 				version: 'https://jsonfeed.org/version/1.1',

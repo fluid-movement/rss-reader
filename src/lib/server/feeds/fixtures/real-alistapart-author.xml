@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Trimmed from https://alistapart.com/main/feed/; author markup retained verbatim. -->
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>A List Apart</title>
+    <link>https://alistapart.com/</link>
+    <item>
+      <title><![CDATA[Designed for a Dead Language]]></title>
+      <author>by <a itemprop="url" class="author" rel="author" href="https://alistapart.com/author/shrey-shah/">Shrey Shah</a></author>
+      <link>https://alistapart.com/article/designed-for-a-dead-language/</link>
+      <guid>https://alistapart.com/article/designed-for-a-dead-language/</guid>
+    </item>
+  </channel>
+</rss>

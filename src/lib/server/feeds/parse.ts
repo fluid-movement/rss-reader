@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import Parser from 'rss-parser';
+import { Parser as HtmlParser } from 'htmlparser2';
 import sanitizeHtml from 'sanitize-html';
 import { htmlToSearchText } from '../db/search-text';
+import { replaceEmbeds } from './replace-embeds';
 
 export interface ParsedItem {
 	guid: string;
@@ -35,7 +37,7 @@ export function webUrl(value: unknown, base?: string): string | null {
 
 export function sanitizeContent(value: string | null, baseUrl?: string): string | null {
 	if (value === null) return null;
-	return sanitizeHtml(value, {
+	return sanitizeHtml(replaceEmbeds(value, webUrl(baseUrl)), {
 		allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img']),
 		allowedAttributes: {
 			a: ['href', 'title', 'rel'],
@@ -63,8 +65,60 @@ export function sanitizeContent(value: string | null, baseUrl?: string): string 
  * (sanitize-html would re-escape "&" to "&amp;", which the UI then shows literally.) Svelte
  * renders these as text, never as HTML.
  */
-const plain = (value: string) => htmlToSearchText(value, { spaceTags: false });
+const plain = (value: string) =>
+	htmlToSearchText(
+		// An unfinished tag is text, not markup (e.g. "if a<b then c").
+		value.replace(/<(?!(?:\/?[a-z][^<>]*>|!--[\s\S]*?-->))/gi, '&lt;'),
+		{ spaceTags: false }
+	);
 const text = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+
+/** rss-parser flattens mixed XML author content to its direct text (often just "by").
+ * Read RSS author text in document order without changing its Atom/content parsing options. */
+function rssAuthors(body: string): Array<string | undefined> {
+	const authors: Array<string | undefined> = [];
+	let depth = 0;
+	let itemDepth = 0;
+	let authorDepth = 0;
+	const parser = new HtmlParser(
+		{
+			onopentag(name) {
+				depth++;
+				if (name === 'item') {
+					itemDepth = depth;
+					authors.push(undefined);
+				} else if (name === 'author' && itemDepth && depth === itemDepth + 1) {
+					authorDepth = depth;
+					authors[authors.length - 1] = '';
+				}
+			},
+			ontext(value) {
+				if (authorDepth) authors[authors.length - 1] += value;
+			},
+			onclosetag() {
+				if (depth === authorDepth) authorDepth = 0;
+				if (depth === itemDepth) itemDepth = 0;
+				depth--;
+			}
+		},
+		{ xmlMode: true }
+	);
+	parser.end(body);
+	return authors;
+}
+
+function displayAuthor(value: unknown): string | null {
+	const raw = plain(text(value) ?? '');
+	// RSS commonly uses "email (Display Name)"; never expose the address itself.
+	const email = /[^\s<>()[\],;]+@[^\s<>()[\],;]+/g;
+	const parenthesized = raw.includes('@') ? raw.match(/\(([^()]+)\)/)?.[1] : null;
+	const name = (parenthesized ?? raw)
+		.replace(email, '')
+		.replace(/^by\b\s*/i, '')
+		.replace(/^[\s<>"(),;]+|[\s<>"(),;]+$/g, '')
+		.trim();
+	return name && /\p{L}/u.test(name) ? name : null;
+}
 const date = (value: unknown): Date | null => {
 	const parsed = typeof value === 'string' ? new Date(value) : null;
 	return parsed && Number.isFinite(parsed.getTime()) ? parsed : null;
@@ -98,7 +152,7 @@ function normalize(
 		title,
 		content: sanitizeContent(content, contentBase),
 		summary: sanitizeContent(text(input.summary), contentBase),
-		author: text(input.author) ? plain(input.author as string) : null,
+		author: displayAuthor(input.author),
 		publishedAt: date(input.publishedAt)
 	};
 }
@@ -147,11 +201,12 @@ export async function parseFeed(body: string, baseUrl: string): Promise<ParsedFe
 			};
 		}
 		const feed = await new Parser().parseString(body);
+		const authors = rssAuthors(body);
 		const siteUrl = webUrl(feed.link, baseUrl);
 		return {
 			title: plain(feed.title ?? baseUrl),
 			siteUrl,
-			items: feed.items.map((item) =>
+			items: feed.items.map((item, index) =>
 				normalize(
 					{
 						id: item.guid ?? item.id,
@@ -159,7 +214,9 @@ export async function parseFeed(body: string, baseUrl: string): Promise<ParsedFe
 						title: item.title,
 						content: item['content:encoded'] ?? item.content ?? item.summary,
 						summary: item.summary ?? item.contentSnippet,
-						author: item.creator ?? item.author,
+						author: [authors[index], item.creator, item.author].find((value) =>
+							displayAuthor(value)
+						),
 						publishedAt: item.isoDate ?? item.pubDate
 					},
 					baseUrl,

@@ -5,6 +5,7 @@
 Install dependencies with `pnpm install`. Copy `.env.example` to `.env` and configure:
 
 - `DATABASE_URL`: SQLite filename, relative to the application root (for example `local.db`).
+- `RSS_READER_CONTACT`: optional project URL or operator contact (for example `mailto:admin@example.com`) sent in `User-Agent: RSSReader/1.0 (+<contact>)` on feed and article requests. Defaults to `https://github.com/fluid-movement/rss-reader` when unset, blank, or unsafe for an HTTP header. Use printable ASCII without parentheses. Set this runtime variable to identify your deployment to publishers.
 - `ORIGIN`: the exact public origin, including port in development. Passkey RP ID and allowed origin are derived from this value. Use HTTPS in production (localhost is supported for development).
 - `BETTER_AUTH_SECRET`: a high-entropy secret of at least 32 characters.
 

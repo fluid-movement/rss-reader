@@ -4,7 +4,7 @@ import { lookup } from 'node:dns/promises';
 import { request } from 'node:http';
 import { brotliCompressSync, deflateSync, gzipSync } from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isPublicAddress, safeFetch } from './fetch';
+import { configureFeedContact, isPublicAddress, safeFetch } from './fetch';
 import { parseFeed } from './parse';
 
 vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
@@ -43,7 +43,47 @@ beforeEach(() => {
 		return req;
 	}) as unknown as typeof request);
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+	vi.useRealTimers();
+	vi.unstubAllEnvs();
+});
+
+describe('fetcher identity', () => {
+	it('supports SvelteKit runtime configuration independently of process.env', async () => {
+		configureFeedContact('https://reader.example/contact');
+		try {
+			await safeFetch('http://public.example/feed');
+			expect(request).toHaveBeenCalledWith(
+				expect.any(URL),
+				expect.objectContaining({
+					headers: expect.objectContaining({
+						'User-Agent': 'RSSReader/1.0 (+https://reader.example/contact)'
+					})
+				}),
+				expect.any(Function)
+			);
+		} finally {
+			configureFeedContact(undefined);
+		}
+	});
+	it.each([
+		[undefined, 'https://github.com/fluid-movement/rss-reader'],
+		['', 'https://github.com/fluid-movement/rss-reader'],
+		['https://reader.example/about', 'https://reader.example/about'],
+		['mailto:admin@example.com', 'mailto:admin@example.com'],
+		['bad\r\nInjected: header', 'https://github.com/fluid-movement/rss-reader']
+	])('sends a safe identifiable User-Agent (%s)', async (value, expected) => {
+		vi.stubEnv('RSS_READER_CONTACT', value);
+		await safeFetch('http://public.example/feed');
+		expect(request).toHaveBeenCalledWith(
+			expect.any(URL),
+			expect.objectContaining({
+				headers: expect.objectContaining({ 'User-Agent': `RSSReader/1.0 (+${expected})` })
+			}),
+			expect.any(Function)
+		);
+	});
+});
 
 describe('SSRF protection', () => {
 	it.each([
