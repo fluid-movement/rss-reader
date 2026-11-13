@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+	<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+	 <channel>
+		<title>Phoronix</title>
+		<link>https://www.phoronix.com/</link>
+		<description>Linux Hardware Reviews, Performance Benchmarks &amp; Open-Source / Free Software News</description>
+		<language>en-us</language>
+	  <item>
+   <title>Intel Posts Initial GCC Compiler Code For Razor Lake &amp; Coral Rapids</title>
+   <link>https://www.phoronix.com/news/Intel-GCC-Coral-Rapids-Razor</link>
+   <guid>https://www.phoronix.com/news/Intel-GCC-Coral-Rapids-Razor</guid>
+   <description>The latest example, today they posted their patches providing new ISA features...</description>
+   <pubDate>Fri, 13 Nov 2026 08:22:22 -0500</pubDate>
+   <dc:creator>Michael Larabel</dc:creator>
+  </item>
+ </channel>
+</rss>

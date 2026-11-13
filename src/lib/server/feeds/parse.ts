@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import Parser from 'rss-parser';
 import sanitizeHtml from 'sanitize-html';
+import { htmlToSearchText } from '../db/search-text';
 
 export interface ParsedItem {
 	guid: string;
@@ -57,7 +58,12 @@ export function sanitizeContent(value: string | null, baseUrl?: string): string 
 	});
 }
 
-const plain = (value: string) => sanitizeHtml(value, { allowedTags: [], allowedAttributes: {} });
+/**
+ * Plain text for titles, authors and feed names: tags dropped and entities decoded once.
+ * (sanitize-html would re-escape "&" to "&amp;", which the UI then shows literally.) Svelte
+ * renders these as text, never as HTML.
+ */
+const plain = (value: string) => htmlToSearchText(value, { spaceTags: false });
 const text = (value: unknown): string | null => (typeof value === 'string' ? value : null);
 const date = (value: unknown): Date | null => {
 	const parsed = typeof value === 'string' ? new Date(value) : null;
@@ -80,7 +86,7 @@ function normalize(
 	const link = webUrl(input.link, siteUrl ?? base);
 	const contentBase = link ?? siteUrl ?? base;
 	const content = text(input.content);
-	const title = plain(text(input.title) ?? 'Untitled');
+	const title = plain(text(input.title) ?? '') || 'Untitled';
 	return {
 		guid:
 			text(input.id)?.trim() ||

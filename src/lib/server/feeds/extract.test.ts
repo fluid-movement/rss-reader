@@ -71,6 +71,24 @@ describe('extractArticleHtml', () => {
 		vi.mocked(safeFetch).mockResolvedValue(page('{}', 'application/json'));
 		await expect(extractArticleHtml('https://news.example/a')).rejects.toThrow(ExtractError);
 	});
+	it('accepts real-world pages above 1 MiB (Wired article pages are 1.1-1.6 MB)', async () => {
+		const padded = html.replace('</body>', `<!-- ${'x'.repeat(1_700_000)} --></body>`);
+		expect(Buffer.byteLength(padded)).toBeGreaterThan(1024 * 1024);
+		expect(Buffer.byteLength(padded)).toBeLessThan(MAX_ARTICLE_BYTES);
+		vi.mocked(safeFetch).mockResolvedValue(page(padded));
+		await expect(extractArticleHtml('https://news.example/a/b')).resolves.toContain(
+			'first paragraph of a long article'
+		);
+	});
+	it('refuses pages above the 2 MiB cap with the safe message', async () => {
+		expect(MAX_ARTICLE_BYTES).toBe(2 * 1024 * 1024);
+		vi.mocked(safeFetch).mockResolvedValue(
+			page(html.replace('</body>', `<!-- ${'x'.repeat(MAX_ARTICLE_BYTES)} --></body>`))
+		);
+		await expect(extractArticleHtml('https://news.example/a/b')).rejects.toThrow(
+			'The article page is too large.'
+		);
+	});
 	it('rejects oversized bodies and size-limit failures', async () => {
 		vi.mocked(safeFetch).mockResolvedValue(page('a'.repeat(MAX_ARTICLE_BYTES + 1)));
 		await expect(extractArticleHtml('https://news.example/a')).rejects.toThrow('too large');

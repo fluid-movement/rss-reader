@@ -2,7 +2,7 @@ import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import type { AppDatabase } from './db/connect';
 import { feeds } from './db/schema';
 import { extractNewItems } from './feeds/extract';
-import { FeedFetchError, safeFetch } from './feeds/fetch';
+import { FeedFetchError, isTransientNetworkError, safeFetch } from './feeds/fetch';
 import { FeedParseError, parseFeed } from './feeds/parse';
 import { runRetentionJob } from './retention';
 import { createFeedService, FeedValidationError } from './feeds/subscribe';
@@ -92,14 +92,21 @@ export function createScheduler(db: AppDatabase) {
 			}
 			return { status: 'refreshed' };
 		} catch (error) {
+			const network = !(error instanceof FeedFetchError) && isTransientNetworkError(error);
 			const safeError = error instanceof FeedFetchError || error instanceof FeedParseError;
-			if (!safeError) console.error('Feed refresh failed', error);
+			if (network) console.warn(`Feed refresh failed (network): ${feed.url}`);
+			else if (!safeError) console.error('Feed refresh failed', error);
 			const errorCount = feed.errorCount + 1;
 			const delay = Math.min(MAX_BACKOFF, 5 * MINUTE * 2 ** Math.min(errorCount - 1, 10));
 			db.update(feeds)
 				.set({
 					errorCount,
-					lastError: (safeError ? error.message : 'Feed refresh failed.')
+					lastError: (network
+						? 'Could not reach the server.'
+						: safeError
+							? error.message
+							: 'Feed refresh failed.'
+					)
 						.replace(/[\r\n\t]+/g, ' ')
 						.slice(0, 300),
 					nextFetchAt: new Date(Date.now() + delay)

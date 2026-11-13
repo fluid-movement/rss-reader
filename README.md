@@ -20,7 +20,9 @@ Start the app with `pnpm dev --port 5301 --strictPort` (set `ORIGIN=http://local
 
 ## Development seed data
 
-`pnpm db:seed` (or `just seed`) fills the local database with a dev user plus fake folders, feeds, items and read/starred state, including a broken feed and a never-fetched feed. The dev login is defined in `scripts/seed-data.ts`. It makes no network requests, resets that user's data on every run (so it is safe to rerun), and refuses to run when `NODE_ENV=production` or when `ORIGIN` is not a localhost/127.0.0.1 URL, because it creates a known-password account. It also refuses a `DATABASE_URL` outside the project directory. The seeded feeds use `example.com` URLs; when the dev server runs, the scheduler may try to refresh them over the network and record fetch errors.
+`pnpm db:seed` (or `just seed`) recreates the dev user (login in `scripts/seed-data.ts`), creates topic folders (Tech, Dev blogs, News, Science, Security, Culture) and queues about 40 REAL, popular feeds (RSS, Atom, RSS 1.0, JSON Feed, gzip/brotli, redirects, large feeds, three with full-text extraction on, one with a 15 minute interval, plus one intentionally dead URL so a broken feed exists). There is no fake data: no items and no read/starred state are created, and the script itself makes no network requests. The feeds are due immediately, so **the dev server (or the production server) must be running**: its in-process scheduler starts with the server and pulls the queued feeds within about a minute. To fill the database without a running server, run `pnpm db:seed --refresh`, which does one refresh pass in the script (needs network access), waits for extraction to finish and lists any feeds that failed (the intentionally dead kottke.org URL is expected to).
+
+The seed resets that user's data on every run (safe to rerun), refuses to run when `NODE_ENV=production` or when `ORIGIN` is not a localhost/127.0.0.1 URL (it creates a known-password account), and refuses a `DATABASE_URL` outside the project directory. Edit the feed list in `scripts/seed-data.ts`.
 
 ## Install as app (PWA)
 

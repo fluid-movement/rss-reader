@@ -2,7 +2,7 @@ import { connectDatabase } from '../src/lib/server/db/connect';
 import { migrateDatabase } from '../src/lib/server/db/migrate';
 import { assertSafeToSeed } from './seed-guard';
 import { DEV_USER } from './seed-data';
-import { seedDatabase } from './seed-lib';
+import { refreshSeededFeeds, seedDatabase } from './seed-lib';
 
 try {
 	// Guard first: nothing is opened before the environment is known to be local development.
@@ -13,10 +13,17 @@ try {
 		migrateDatabase(db);
 		const summary = await seedDatabase(db);
 		console.log(
-			`Seeded ${summary.folders} folders, ${summary.feeds} feeds, ${summary.items} items ` +
-				`(${summary.read} read, ${summary.starred} starred) for ${DEV_USER.email}. ` +
-				'See scripts/seed-data.ts for the dev login.'
+			`Queued ${summary.feeds} real feeds in ${summary.folders} folders for ${DEV_USER.email}. ` +
+				'See scripts/seed-data.ts for the dev login. Start the dev server: its scheduler pulls them within a minute.'
 		);
+		if (process.argv.includes('--refresh')) {
+			console.log('Refreshing once (network access)...');
+			const result = await refreshSeededFeeds(db, summary.userId);
+			console.log(
+				`Refresh done: ${result.refreshed} refreshed, ${result.failed} failed, ${result.skipped} skipped.`
+			);
+			for (const feed of result.failures) console.log(`  failed: ${feed.title} (${feed.error})`);
+		}
 	} finally {
 		client.close();
 	}

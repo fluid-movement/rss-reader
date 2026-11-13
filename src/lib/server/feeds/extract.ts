@@ -6,7 +6,7 @@ import { DomParseError, parseArticleInWorker } from './dom-worker';
 import { FeedFetchError, safeFetch } from './fetch';
 
 /** Article pages are capped well below the feed limit; extraction is best effort. */
-export const MAX_ARTICLE_BYTES = 1024 * 1024;
+export const MAX_ARTICLE_BYTES = 2 * 1024 * 1024;
 const MAX_STORED_CHARS = 500_000;
 const HTML_TYPE = /^(text\/html|application\/xhtml\+xml)\b/i;
 

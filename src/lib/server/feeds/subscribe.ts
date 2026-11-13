@@ -95,7 +95,13 @@ export function createFeedService(db: AppDatabase) {
 		ingestItems,
 		ingestItemIds,
 		/** OPML subscriptions are queued without discovery or network access. */
-		queueFeed(userId: string, url: string, title: string, folderId?: string) {
+		queueFeed(
+			userId: string,
+			url: string,
+			title: string,
+			folderId?: string,
+			options: { refreshIntervalMinutes?: number; extractFullText?: boolean } = {}
+		) {
 			requireFolder(userId, folderId);
 			try {
 				url = normalizeFeedUrl(url);
@@ -108,7 +114,8 @@ export function createFeedService(db: AppDatabase) {
 					userId,
 					url,
 					title: title || url,
-					refreshIntervalMinutes: DEFAULT_REFRESH_MINUTES,
+					refreshIntervalMinutes: options.refreshIntervalMinutes ?? DEFAULT_REFRESH_MINUTES,
+					extractFullText: options.extractFullText ?? false,
 					folderId: folderId || null,
 					nextFetchAt: new Date()
 				})

@@ -9,6 +9,31 @@ import ipaddr from 'ipaddr.js';
 
 export class FeedFetchError extends Error {}
 
+const NETWORK_CODES = new Set([
+	'ENOTFOUND',
+	'ECONNREFUSED',
+	'ECONNRESET',
+	'ETIMEDOUT',
+	'EAI_AGAIN',
+	'EHOSTUNREACH',
+	'ENETUNREACH',
+	'EPIPE',
+	'ECONNABORTED',
+	'UND_ERR_SOCKET'
+]);
+/** True for transient network failures (DNS, refused/reset connections, timeouts). */
+export function isTransientNetworkError(error: unknown, depth = 0): boolean {
+	if (!error || typeof error !== 'object' || depth > 3) return false;
+	const { code, cause, errors } = error as { code?: unknown; cause?: unknown; errors?: unknown };
+	if (typeof code === 'string' && NETWORK_CODES.has(code)) return true;
+	if (isTransientNetworkError(cause, depth + 1)) return true;
+	return (
+		Array.isArray(errors) &&
+		errors.length > 0 &&
+		errors.every((e) => isTransientNetworkError(e, depth + 1))
+	);
+}
+
 export interface SafeFetchOptions {
 	timeoutMs?: number;
 	maxBytes?: number;

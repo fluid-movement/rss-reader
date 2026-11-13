@@ -109,6 +109,56 @@ describe('feed parsing and sanitization', () => {
 	});
 });
 
+describe('real-world title entities', () => {
+	it('stores titles as plain text: an RSS "&amp;" is "&", not a literal "&amp;"', async () => {
+		const feed = await parseFeed(
+			fixture('real-phoronix-entities.xml'),
+			'https://www.phoronix.com/rss.php'
+		);
+		expect(feed.items[0].title).toBe(
+			'Intel Posts Initial GCC Compiler Code For Razor Lake & Coral Rapids'
+		);
+		expect(feed.items[0].author).toBe('Michael Larabel');
+	});
+	it('decodes HTML-typed Atom titles once and keeps content escaped', async () => {
+		const feed = await parseFeed(
+			fixture('real-kottke-html-title.xml'),
+			'https://feeds.kottke.org/main'
+		);
+		expect(feed.items[0].title).toBe('Grocery Shopping With a Bow & Arrow');
+		expect(feed.items[0].content).toContain('Tom &amp; Jerry');
+		expect(feed.items[0].content).toContain(
+			'src="https://kottke.org/cdn-cgi/image/format=auto,width=1200/images/posts/01/x.jpg"'
+		);
+	});
+	it('keeps inline markup in titles from adding spaces and decodes exactly once', async () => {
+		const rss = (title: string) =>
+			`<rss version="2.0"><channel><title>T</title><item><title>${title}</title><guid>1</guid></item></channel></rss>`;
+		const t = async (title: string) =>
+			(await parseFeed(rss(title), 'https://x.test/f')).items[0].title;
+		expect(await t('CO&lt;sub&gt;2&lt;/sub&gt; &amp;amp; H2O')).toBe('CO2 & H2O');
+		expect(await t('Using &amp;lt;div&amp;gt; &amp;amp; more')).toBe('Using <div> & more');
+		expect(await t('&lt;img src=x&gt;')).toBe('Untitled');
+		const json = await parseFeed(
+			JSON.stringify({
+				version: 'https://jsonfeed.org/version/1.1',
+				title: 'J',
+				items: [{ id: '1', title: 'Tom &amp; <i>Jerry</i>x', content_text: 'a' }]
+			}),
+			'https://x.test/f.json'
+		);
+		expect(json.items[0].title).toBe('Tom & Jerryx');
+	});
+	it('does not let markup through titles', async () => {
+		const feed = await parseFeed(
+			`<rss version="2.0"><channel><title>T &amp; U</title><item><title>&lt;b&gt;Hi&lt;/b&gt; &amp;lt;3 &lt;script&gt;alert(1)&lt;/script&gt;</title><guid>1</guid></item></channel></rss>`,
+			'https://x.test/feed'
+		);
+		expect(feed.title).toBe('T & U');
+		expect(feed.items[0].title).not.toMatch(/<(b|script)/);
+	});
+});
+
 describe('HTML feed discovery', () => {
 	it('discovers alternate RSS, Atom, JSON with relative URLs, base and entities', () => {
 		expect(discoverFeedUrls(fixture('site.html'), 'https://example.com/')).toEqual([

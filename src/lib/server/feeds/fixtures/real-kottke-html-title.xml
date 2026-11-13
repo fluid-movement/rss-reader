@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:base="https://kottke.org/">
+    <title>kottke.org</title>
+    <link rel="alternate" type="text/html" href="https://kottke.org/" />
+    <id>tag:kottke.org,2009-08-11:05118</id>
+    <updated>2026-11-12T16:01:00Z</updated>
+<entry>
+    <title type="html"><![CDATA[Grocery Shopping With a Bow &amp; Arrow]]></title>
+    <link rel="alternate" type="text/html" href="https://kottke.org/26/11/grocery-shopping-with-a-bow-arrow" />
+    <id>tag:kottke.org,2026-11-12:49990</id>
+    <published>2026-11-12T21:01:00Z</published>
+    <author><name>Jason Kottke</name></author>
+    <content type="html"><![CDATA[<p><img src="/cdn-cgi/image/format=auto,width=1200/images/posts/01/x.jpg" srcset="/a.jpg 500w"> Tom &amp; Jerry</p>]]></content>
+</entry>
+</feed>

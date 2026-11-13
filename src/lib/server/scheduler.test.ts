@@ -179,6 +179,28 @@ describe('refresh scheduler', () => {
 		expect(get('bad').lastError).toBe('Feed refresh failed.');
 		expect(log).toHaveBeenCalledExactlyOnceWith('Feed refresh failed', internal);
 	});
+	it('treats transient network errors as safe: short message, one-line warning, no stack', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		for (const code of ['ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN']) {
+			add('net' + code);
+			vi.mocked(safeFetch).mockRejectedValue(
+				Object.assign(new Error(`getaddrinfo ${code} secret.internal.host`), { code })
+			);
+			expect(await scheduler.refreshFeed('net' + code, 'owner')).toEqual({ status: 'failed' });
+			expect(get('net' + code).lastError).toBe('Could not reach the server.');
+		}
+		// Nested (AggregateError / cause) shapes.
+		add('agg');
+		vi.mocked(safeFetch).mockRejectedValue(
+			new AggregateError([Object.assign(new Error('x'), { code: 'ECONNREFUSED' })])
+		);
+		await scheduler.refreshFeed('agg', 'owner');
+		expect(get('agg').lastError).toBe('Could not reach the server.');
+		expect(warn).toHaveBeenCalledTimes(6);
+		expect(warn.mock.calls[0]).toHaveLength(1);
+		expect(error).not.toHaveBeenCalled();
+	});
 	it('stores only bounded, single-line messages for known parse errors', async () => {
 		add('bad');
 		const log = vi.spyOn(console, 'error').mockImplementation(() => {});
