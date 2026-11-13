@@ -6,6 +6,8 @@ export interface ArticlePreview {
 	summary: string | null;
 	feedId: string;
 	feedTitle: string;
+	/** The original web link, null when the item has none. */
+	link: string | null;
 	publishedAt: Date | null;
 	/** publishedAt, falling back to when the item was fetched. */
 	sortAt: Date;

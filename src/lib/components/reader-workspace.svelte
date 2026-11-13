@@ -17,7 +17,15 @@
 	import { itemHref } from '#lib/reader-paths.ts';
 	import { setReaderShortcutContext } from '#lib/shortcut-handler.svelte.ts';
 	import { EXTRA_PAGE_SIZE, loadChunked, withOpenArticle } from '#lib/reader-list.ts';
-	import { isRead, isStarred, markViewRead } from '#lib/reader-state.svelte.ts';
+	import ArticleRow from '#lib/components/article-row.svelte';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
+	import {
+		isRead,
+		isStarred,
+		markViewRead,
+		undoMarkRead,
+		unreadAffected
+	} from '#lib/reader-state.svelte.ts';
 	import type {
 		ArticlePreview,
 		HighlightSegment,
@@ -190,12 +198,21 @@
 			timeZone: 'UTC'
 		}).format(date);
 	}
+	/** Mark all read above this many affected items asks first. */
+	const CONFIRM_ABOVE = 10;
+	let confirmMark = $state<{ olderThanDays?: number; count: number } | null>(null);
+
+	function requestMarkAll(olderThanDays?: number) {
+		const count = unreadAffected(articles, olderThanDays).length;
+		if (count > CONFIRM_ABOVE) confirmMark = { olderThanDays, count };
+		else void markAll(olderThanDays);
+	}
 	async function markAll(olderThanDays?: number) {
-		const ok = await markViewRead(data, articles, olderThanDays);
-		if (ok)
-			toast.success(
-				olderThanDays === undefined ? 'Marked all as read' : 'Marked older articles as read'
-			);
+		const ids = await markViewRead(data, articles, olderThanDays);
+		if (!ids) return;
+		toast(olderThanDays === undefined ? 'Marked all as read' : 'Marked older articles as read', {
+			action: { label: 'Undo', onClick: () => void undoMarkRead(ids) }
+		});
 	}
 </script>
 
@@ -245,11 +262,19 @@
 								>{/snippet}</DropdownMenu.Trigger
 						>
 						<DropdownMenu.Content align="end">
-							<DropdownMenu.Item onSelect={() => markAll()}>Mark all as read</DropdownMenu.Item>
+							<DropdownMenu.Item onSelect={() => requestMarkAll()}
+								>Mark all as read</DropdownMenu.Item
+							>
 							<DropdownMenu.Separator />
-							<DropdownMenu.Item onSelect={() => markAll(1)}>Older than 1 day</DropdownMenu.Item>
-							<DropdownMenu.Item onSelect={() => markAll(7)}>Older than 1 week</DropdownMenu.Item>
-							<DropdownMenu.Item onSelect={() => markAll(30)}>Older than 1 month</DropdownMenu.Item>
+							<DropdownMenu.Item onSelect={() => requestMarkAll(1)}
+								>Older than 1 day</DropdownMenu.Item
+							>
+							<DropdownMenu.Item onSelect={() => requestMarkAll(7)}
+								>Older than 1 week</DropdownMenu.Item
+							>
+							<DropdownMenu.Item onSelect={() => requestMarkAll(30)}
+								>Older than 1 month</DropdownMenu.Item
+							>
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>{/if}
 			</header>
@@ -278,59 +303,50 @@
 				{/if}
 				{#if articles.length}
 					<Item.Group class="min-w-0 p-2" bind:ref={listElement}>
-						{#each articles as article (article.id)}
+						{#each articles as article, index (article.id)}
 							{@const read = isRead(article)}
-							<Item.Root
-								variant={itemId === article.id ? 'muted' : 'default'}
-								size="sm"
-								role="listitem"
+							<ArticleRow
+								{article}
+								{read}
+								starred={isStarred(article)}
+								href={itemHref(data, article.id)}
+								selected={itemId === article.id}
+								above={() => articles.slice(0, index)}
+								below={() => articles.slice(index + 1)}
 							>
-								{#snippet child({ props })}
-									<!-- eslint-disable svelte/no-navigation-without-resolve -- itemHref() wraps resolve() for the per-view item route. -->
-									<a
-										{...props}
-										href={itemHref(data, article.id)}
-										aria-current={itemId === article.id ? 'page' : undefined}
+								<Item.Content>
+									<div
+										class="flex items-center justify-between gap-3 text-xs text-muted-foreground"
 									>
-										<Item.Content>
-											<div
-												class="flex items-center justify-between gap-3 text-xs text-muted-foreground"
-											>
-												<span class="flex min-w-0 items-center gap-1.5">
-													{#if !read}<Circle
-															class="size-2 shrink-0 fill-primary text-primary"
-															aria-label="Unread"
-														/>{/if}
-													<span class="truncate">{article.feedTitle}</span>
-												</span>
-												<span class="flex shrink-0 items-center gap-2">
-													{#if isStarred(article)}<Star
-															class="size-3.5 fill-current text-amber-500"
-															aria-label="Starred"
-														/>{/if}
-													{#if article.publishedAt}<time
-															datetime={article.publishedAt.toISOString()}
-															>{dateLabel(article.publishedAt)}</time
-														>{/if}
-												</span>
-											</div>
-											<Item.Title
-												class={read ? 'font-normal text-muted-foreground' : 'font-semibold'}
-											>
-												{#if article.titleParts}{@render parts(
-														article.titleParts
-													)}{:else}{article.title}{/if}
-											</Item.Title>
-											{#if article.snippetParts}<Item.Description>
-													{@render parts(article.snippetParts)}
-												</Item.Description>{:else if article.summary}<Item.Description>
-													{article.summary}
-												</Item.Description>{/if}
-										</Item.Content>
-									</a>
-									<!-- eslint-enable svelte/no-navigation-without-resolve -->
-								{/snippet}
-							</Item.Root>
+										<span class="flex min-w-0 items-center gap-1.5">
+											{#if !read}<Circle
+													class="size-2 shrink-0 fill-primary text-primary"
+													aria-label="Unread"
+												/>{/if}
+											<span class="truncate">{article.feedTitle}</span>
+										</span>
+										<span class="flex shrink-0 items-center gap-2">
+											{#if isStarred(article)}<Star
+													class="size-3.5 fill-current text-amber-500"
+													aria-label="Starred"
+												/>{/if}
+											{#if article.publishedAt}<time datetime={article.publishedAt.toISOString()}
+													>{dateLabel(article.publishedAt)}</time
+												>{/if}
+										</span>
+									</div>
+									<Item.Title class={read ? 'font-normal text-muted-foreground' : 'font-semibold'}>
+										{#if article.titleParts}{@render parts(
+												article.titleParts
+											)}{:else}{article.title}{/if}
+									</Item.Title>
+									{#if article.snippetParts}<Item.Description>
+											{@render parts(article.snippetParts)}
+										</Item.Description>{:else if article.summary}<Item.Description>
+											{article.summary}
+										</Item.Description>{/if}
+								</Item.Content>
+							</ArticleRow>
 						{/each}
 					</Item.Group>
 					{#if hasMore}
@@ -385,3 +401,27 @@
 		{/if}
 	</div>
 </div>
+
+<AlertDialog.Root
+	open={confirmMark !== null}
+	onOpenChange={(open) => {
+		if (!open) confirmMark = null;
+	}}
+>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Mark {confirmMark?.count} articles as read?</AlertDialog.Title>
+			<AlertDialog.Description>You can undo this right after.</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action
+				onclick={() => {
+					const days = confirmMark?.olderThanDays;
+					confirmMark = null;
+					void markAll(days);
+				}}>Mark as read</AlertDialog.Action
+			>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

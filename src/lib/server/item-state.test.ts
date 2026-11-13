@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { connectDatabase } from './db/connect';
 import { migrateDatabase } from './db/migrate';
 import { feeds, folders, items, itemState, user } from './db/schema';
-import { markViewRead, setItemState } from './item-state';
+import { markViewRead, markViewReadIds, setItemsRead, setItemState } from './item-state';
 import { getReaderData, getSelectedItem, getShellData } from './reader';
 
 let connection: ReturnType<typeof connectDatabase>;
@@ -127,5 +127,22 @@ describe('views and the open article', () => {
 	});
 	it('still rejects an article outside the view', () => {
 		expect(() => getSelectedItem(connection.db, 'a', { view: 'unread', itemId: 'ib' })).toThrow();
+	});
+});
+
+describe('setItemsRead and markViewReadIds', () => {
+	it('returns the changed ids so a bulk change can be undone exactly', () => {
+		setItemState(connection.db, 'a', 'i1', { read: true });
+		const ids = markViewReadIds(connection.db, 'a', { view: 'feed', id: 'f1' });
+		expect(ids).not.toContain('i1');
+		expect(ids.length).toBe(1);
+		expect(setItemsRead(connection.db, 'a', ids, false)).toBe(1);
+		expect(state('a', ids[0])?.readAt).toBeNull();
+		expect(state('a', 'i1')?.readAt).toBeInstanceOf(Date);
+	});
+	it('skips ids owned by another user', () => {
+		expect(setItemsRead(connection.db, 'a', ['i1', 'ib'], true)).toBe(1);
+		expect(state('b', 'ib')).toBeUndefined();
+		expect(state('a', 'ib')).toBeUndefined();
 	});
 });

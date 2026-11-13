@@ -119,6 +119,7 @@ const preview = {
 	summary: items.summary,
 	feedId: feeds.id,
 	feedTitle: feeds.title,
+	link: items.link,
 	publishedAt: items.publishedAt,
 	sortAt: sql<number>`coalesce(${items.publishedAt}, ${items.fetchedAt})`.mapWith(
 		(value: number) => new Date(value)
@@ -173,6 +174,7 @@ export function getArticlePage(
 			return {
 				...article,
 				summary: articleSummary(article.summary),
+				link: webUrl(article.link),
 				...(found
 					? {
 							titleParts: found.title,
@@ -243,7 +245,6 @@ export function getSelectedItem(
 		.select({
 			...preview,
 			author: items.author,
-			link: items.link,
 			content: items.content,
 			fullContent: items.fullContent
 		})

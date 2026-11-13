@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { ReaderView } from '#lib/reader.ts';
 import type { AppDatabase } from './db/connect';
 import { feeds, items, itemState } from './db/schema';
@@ -46,6 +46,15 @@ export interface MarkReadOptions {
 
 /** Marks every unread item in the view as read; returns how many changed. */
 export function markViewRead(db: AppDatabase, userId: string, options: MarkReadOptions): number {
+	return markViewReadIds(db, userId, options).length;
+}
+
+/** Like markViewRead but returns the ids that changed, so the change can be undone exactly. */
+export function markViewReadIds(
+	db: AppDatabase,
+	userId: string,
+	options: MarkReadOptions
+): string[] {
 	const { view, id, olderThanDays } = options;
 	assertViewOwned(db, userId, view, id);
 	const cutoff =
@@ -79,5 +88,37 @@ export function markViewRead(db: AppDatabase, userId: string, options: MarkReadO
 				})
 				.run();
 	});
-	return ids.length;
+	return ids;
+}
+
+/**
+ * Sets read state for several items at once (mark above/below, undo). Ids the user does not
+ * own are skipped. Returns the number of items changed.
+ */
+export function setItemsRead(
+	db: AppDatabase,
+	userId: string,
+	itemIds: string[],
+	read: boolean
+): number {
+	const owned: string[] = [];
+	for (let i = 0; i < itemIds.length; i += CHUNK)
+		owned.push(
+			...db
+				.select({ id: items.id })
+				.from(items)
+				.innerJoin(feeds, eq(items.feedId, feeds.id))
+				.where(and(eq(feeds.userId, userId), inArray(items.id, itemIds.slice(i, i + CHUNK))))
+				.all()
+				.map((row) => row.id)
+		);
+	const readAt = read ? new Date() : null;
+	db.transaction((tx) => {
+		for (let i = 0; i < owned.length; i += CHUNK)
+			tx.insert(itemState)
+				.values(owned.slice(i, i + CHUNK).map((itemId) => ({ userId, itemId, readAt })))
+				.onConflictDoUpdate({ target: [itemState.userId, itemState.itemId], set: { readAt } })
+				.run();
+	});
+	return owned.length;
 }

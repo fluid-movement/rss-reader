@@ -52,6 +52,7 @@ async function post(body: unknown) {
 		body: JSON.stringify(body)
 	});
 	if (!response.ok) throw new Error(`Request failed (${response.status})`);
+	return response;
 }
 
 type Target = Pick<ArticlePreview, 'id' | 'feedId' | 'read' | 'starred'>;
@@ -97,31 +98,50 @@ export async function updateArticle(
 	return true;
 }
 
-/** Mark everything in the view (optionally only items older than N days) read. */
-export async function markViewRead(
-	view: { view: ReaderView; viewId: string | null },
-	articles: (Target & { sortAt: Date })[],
+type Applied = { article: Target; previous: Override | undefined; mine: number }[];
+
+function revert(applied: Applied) {
+	for (const { article, previous, mine } of applied) {
+		if (overrides[article.id]?.seq !== mine) continue;
+		if (previous) overrides[article.id] = previous;
+		else delete overrides[article.id];
+	}
+}
+
+/** Unread articles a "mark read" would change among those loaded (optionally older than N days). */
+export function unreadAffected<T extends Target & { sortAt: Date }>(
+	articles: T[],
 	olderThanDays?: number
 ) {
 	const cutoff = olderThanDays === undefined ? undefined : Date.now() - olderThanDays * 86_400_000;
-	const affected = articles.filter(
+	return articles.filter(
 		(article) => !isRead(article) && (cutoff === undefined || article.sortAt.getTime() < cutoff)
 	);
-	const applied = affected.map((article) => ({ article, ...apply(article, { read: true }) }));
+}
+
+/** Matches the server's per-request id cap. */
+const BATCH_IDS = 80;
+
+/** Sets read state for specific articles through the API in capped batches. */
+async function postReadBatches(ids: string[], read: boolean) {
+	for (let i = 0; i < ids.length; i += BATCH_IDS)
+		await post({ action: 'items', ids: ids.slice(i, i + BATCH_IDS), read });
+}
+
+/**
+ * Optimistically set read state for exactly these articles (mark above/below). On failure each
+ * article is restored and a toast is shown.
+ */
+export async function setArticlesRead(articles: Target[], read: boolean) {
+	const applied = articles.map((article) => ({ article, ...apply(article, { read }) }));
 	try {
-		await post({
-			action: 'markRead',
-			view: view.view,
-			id: view.viewId ?? undefined,
-			olderThanDays
-		});
+		await postReadBatches(
+			articles.map((article) => article.id),
+			read
+		);
 	} catch {
-		for (const { article, previous, mine } of applied) {
-			if (overrides[article.id]?.seq !== mine) continue;
-			if (previous) overrides[article.id] = previous;
-			else delete overrides[article.id];
-		}
-		toast.error('Could not mark articles as read. Nothing was changed.');
+		revert(applied);
+		toast.error('Could not save your change. It has been undone.');
 		return false;
 	}
 	await syncReaderData();
@@ -129,5 +149,52 @@ export async function markViewRead(
 		applied.map(({ article }) => article.id),
 		applied.map(({ mine }) => mine)
 	);
+	return true;
+}
+
+/**
+ * Mark everything in the view (optionally only items older than N days) read. Resolves with the
+ * ids the server changed (null on failure) so the caller can offer an exact undo.
+ */
+export async function markViewRead(
+	view: { view: ReaderView; viewId: string | null },
+	articles: (Target & { sortAt: Date })[],
+	olderThanDays?: number
+): Promise<string[] | null> {
+	const applied = unreadAffected(articles, olderThanDays).map((article) => ({
+		article,
+		...apply(article, { read: true })
+	}));
+	let ids: string[];
+	try {
+		const response = await post({
+			action: 'markRead',
+			view: view.view,
+			id: view.viewId ?? undefined,
+			olderThanDays
+		});
+		ids = ((await response.json()) as { ids?: string[] }).ids ?? [];
+	} catch {
+		revert(applied);
+		toast.error('Could not mark articles as read. Nothing was changed.');
+		return null;
+	}
+	await syncReaderData();
+	settle(
+		applied.map(({ article }) => article.id),
+		applied.map(({ mine }) => mine)
+	);
+	return ids;
+}
+
+/** Undo a bulk mark-read: restores unread for exactly the ids that were changed. */
+export async function undoMarkRead(ids: string[]) {
+	try {
+		await postReadBatches(ids, false);
+	} catch {
+		toast.error('Could not undo. Your articles are still marked as read.');
+		return false;
+	}
+	await syncReaderData();
 	return true;
 }

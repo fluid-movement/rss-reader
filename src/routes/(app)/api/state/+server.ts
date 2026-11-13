@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { db } from '#lib/server/db/index.ts';
-import { markViewRead, setItemState } from '#lib/server/item-state.ts';
+import { markViewReadIds, setItemsRead, setItemState } from '#lib/server/item-state.ts';
 import type { ReaderView } from '#lib/reader.ts';
 import type { RequestHandler } from './$types';
 
@@ -8,6 +8,8 @@ const VIEWS: ReaderView[] = ['all', 'unread', 'starred', 'feed', 'folder'];
 /** Real bodies are a few hundred bytes; anything bigger is rejected before parsing. */
 const MAX_BODY_BYTES = 4096;
 const MAX_OLDER_THAN_DAYS = 3650;
+/** About 40 bytes per id keeps a batch of ids under the body cap. */
+const MAX_BATCH_IDS = 80;
 
 /** Reads the body as text, stopping as soon as it exceeds the cap (also without a content-length). */
 async function readCappedBody(request: Request): Promise<string> {
@@ -73,11 +75,25 @@ export const POST: RequestHandler = async ({ locals, request, url }) => {
 				olderThanDays > MAX_OLDER_THAN_DAYS)
 		)
 			error(400, 'Invalid age.');
-		const updated = markViewRead(db, locals.user.id, {
+		const ids = markViewReadIds(db, locals.user.id, {
 			view: view as ReaderView,
 			id: typeof id === 'string' ? id : undefined,
 			olderThanDays
 		});
+		// The ids let the client undo exactly this change.
+		return json({ ok: true, updated: ids.length, ids });
+	}
+	if (body.action === 'items') {
+		const { ids, read } = body;
+		if (
+			!Array.isArray(ids) ||
+			ids.length === 0 ||
+			ids.length > MAX_BATCH_IDS ||
+			ids.some((value) => typeof value !== 'string' || !value)
+		)
+			error(400, 'Invalid items.');
+		if (typeof read !== 'boolean') error(400, 'Invalid read value.');
+		const updated = setItemsRead(db, locals.user.id, ids as string[], read);
 		return json({ ok: true, updated });
 	}
 	error(400, 'Unknown action.');

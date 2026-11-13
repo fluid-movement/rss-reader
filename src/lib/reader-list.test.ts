@@ -8,6 +8,7 @@ const article = (id: string, day: number): ArticlePreview => ({
 	summary: null,
 	feedId: 'f',
 	feedTitle: 'Feed',
+	link: null,
 	publishedAt: null,
 	sortAt: new Date(Date.UTC(2026, 0, day)),
 	read: false,
