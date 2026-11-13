@@ -1,0 +1,1 @@
+- 2026-11-13T11:34:14Z claude-code: Implemented by sonnet; reviewed by separate sonnet in real headless Chromium (scroll, Load more, authz of /api/articles and loaders, a11y of hidden mobile list, sync/poll). Review fixes (chunked refetch beyond 500, Load more vs sync race, empty cursor) applied and verified with 1300 items.
