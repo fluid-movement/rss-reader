@@ -1,0 +1,4 @@
+- [x] Every child issue is done: foundations, swipe between articles, reader action bar, row gestures and long-press menu, pull to refresh, reader polish, transitions and performance, test harness
+- [x] Every gesture (swipe between articles, row swipe, long-press, pull to refresh) has a visible, accessible alternative, verified in emulation by the child checks
+- [x] Safe areas and 44 px touch targets hold on phone widths, and desktop layout and keyboard shortcuts are unchanged, verified by the foundations and action bar checks
+- [x] pnpm test:mobile (iPhone 14 and Pixel 7 emulation) passes and a real-device checklist is documented in the README; physical iOS and Android verification is tracked there and in the PWA issue, not claimed here
