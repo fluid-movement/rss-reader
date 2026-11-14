@@ -1,6 +1,6 @@
 /** Deterministic offline fixture for the mobile tests: inserted through the service layer. */
 export const FIXTURE_USER = {
-	email: 'mobile-tests@example.test',
+	username: 'mobile-tests',
 	name: 'Mobile tests',
 	password: 'mobile-test-password'
 };

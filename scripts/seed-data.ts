@@ -1,6 +1,6 @@
 /** Dev seed definition: the dev login, topic folders and REAL feeds the app pulls itself. */
 
-export const DEV_USER = { email: 'test@example.com', name: 'user', password: 'LHXZi8y$L2WfV5' };
+export const DEV_USER = { username: 'test', name: 'user', password: 'LHXZi8y$L2WfV5' };
 
 export const SEED_FOLDERS = [
 	'Tech',

@@ -62,7 +62,7 @@ try {
 			}
 		]);
 	}
-	console.log(`Fixture ready: ${ARTICLE_COUNT} articles for ${FIXTURE_USER.email}.`);
+	console.log(`Fixture ready: ${ARTICLE_COUNT} articles for ${FIXTURE_USER.username}.`);
 } finally {
 	client.close();
 }

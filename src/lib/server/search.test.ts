@@ -106,12 +106,17 @@ describe('index sync', () => {
 			const journalPath = join(dir, 'meta', '_journal.json');
 			const journal = JSON.parse(readFileSync(journalPath, 'utf8'));
 			const full = journal.entries;
-			journal.entries = full.filter((entry: { tag: string }) => !entry.tag.endsWith('items_fts'));
-			expect(journal.entries.length).toBe(full.length - 1);
+			// Keep only the migrations before items_fts so the upgrade applies it (and later ones).
+			const ftsIndex = full.findIndex((entry: { tag: string }) => entry.tag.endsWith('items_fts'));
+			journal.entries = full.slice(0, ftsIndex);
+			expect(journal.entries.length).toBeLessThan(full.length);
 			writeFileSync(journalPath, JSON.stringify(journal));
 			const old = connectDatabase(':memory:');
 			migrate(old.db, { migrationsFolder: dir });
-			old.db.insert(user).values({ id: 'u', email: 'u@example.com', name: 'U' }).run();
+			// The old schema predates the username column, so insert the row with raw SQL.
+			old.client
+				.prepare("INSERT INTO user (id, email, name) VALUES ('u', 'u@example.com', 'U')")
+				.run();
 			old.db
 				.insert(feeds)
 				.values({ id: 'f', userId: 'u', title: 'F', url: 'https://x.test/' })

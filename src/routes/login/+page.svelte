@@ -39,7 +39,7 @@
 	<Card.Root class="w-full max-w-sm">
 		<Card.Header>
 			<Card.Title><h1>Sign in to RSS Reader</h1></Card.Title>
-			<Card.Description>Use your email and password or an existing passkey.</Card.Description>
+			<Card.Description>Use your username and password or an existing passkey.</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<form method="POST">
@@ -51,8 +51,8 @@
 						</Alert.Root>
 					{/if}
 					<Field.Field>
-						<Field.FieldLabel for="email">Email</Field.FieldLabel>
-						<Input id="email" name="email" type="email" autocomplete="username" required />
+						<Field.FieldLabel for="username">Username</Field.FieldLabel>
+						<Input id="username" name="username" type="text" autocomplete="username" required />
 					</Field.Field>
 					<Field.Field>
 						<Field.FieldLabel for="password">Password</Field.FieldLabel>

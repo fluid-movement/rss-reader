@@ -32,9 +32,7 @@ beforeEach(() => {
 
 function event(cookie?: string, authenticated = true) {
 	return {
-		locals: authenticated
-			? { user: { id: 'alice', name: 'Alice', email: 'alice@example.com' } }
-			: {},
+		locals: authenticated ? { user: { id: 'alice', name: 'Alice', username: 'alice' } } : {},
 		depends: vi.fn(),
 		cookies: { get: vi.fn(() => cookie) }
 	};

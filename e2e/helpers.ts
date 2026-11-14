@@ -64,7 +64,7 @@ export async function swipeAcross(page: Page, locator: Locator, dx: number) {
 /** Signs in through the real login form (touch tap) and waits for the reader. */
 export async function login(page: Page) {
 	await page.goto('/login');
-	await page.getByLabel('Email').fill(FIXTURE_USER.email);
+	await page.getByLabel('Username').fill(FIXTURE_USER.username);
 	await page.getByLabel('Password').fill(FIXTURE_USER.password);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).tap();
 	await page.waitForURL((url) => !url.pathname.startsWith('/login'));

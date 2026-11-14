@@ -19,7 +19,7 @@ export interface SeedSummary {
 export async function seedDatabase(db: AppDatabase): Promise<SeedSummary> {
 	// Password hashing is async, so user creation cannot sit inside a synchronous SQLite
 	// transaction. Delete and create are each atomic and a rerun always converges.
-	db.delete(user).where(eq(user.email, DEV_USER.email)).run();
+	db.delete(user).where(eq(user.username, DEV_USER.username)).run();
 	const dev = await createConsoleUser(db, DEV_USER);
 
 	return db.transaction((tx) => {

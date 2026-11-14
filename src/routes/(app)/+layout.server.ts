@@ -11,7 +11,11 @@ export const load: LayoutServerLoad = ({ locals, depends, cookies }) => {
 	const { readerFontSize, readerWidth } = getUserPrefs(db, locals.user.id);
 	const shell = getShellData(db, locals.user.id);
 	return {
-		user: { id: locals.user.id, name: locals.user.name, email: locals.user.email },
+		user: {
+			id: locals.user.id,
+			name: locals.user.name,
+			username: locals.user.username ?? locals.user.name
+		},
 		// Reader preferences ride along with the shell so they are in the first server render.
 		readerPrefs: { fontSize: readerFontSize, width: readerWidth },
 		...shell,

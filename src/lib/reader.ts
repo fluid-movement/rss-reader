@@ -56,7 +56,7 @@ export interface ReaderData {
 export type ReaderItemData = ReaderData & { selectedItem: ReaderItem };
 
 export interface ShellData {
-	user: { id: string; name: string; email: string };
+	user: { id: string; name: string; username: string };
 	collapsedFolders: string[];
 	feeds: {
 		id: string;

@@ -10,13 +10,13 @@ export const load: PageServerLoad = ({ locals }) => {
 export const actions: Actions = {
 	default: async ({ request }) => {
 		const data = await request.formData();
-		const email = data.get('email')?.toString().trim() ?? '';
+		const username = data.get('username')?.toString().trim() ?? '';
 		const password = data.get('password')?.toString() ?? '';
-		if (!email || !password) return fail(400, { message: 'Enter your email and password.' });
+		if (!username || !password) return fail(400, { message: 'Enter your username and password.' });
 		try {
-			await auth.api.signInEmail({ body: { email, password }, headers: request.headers });
+			await auth.api.signInUsername({ body: { username, password }, headers: request.headers });
 		} catch (error) {
-			if (error instanceof APIError) return fail(400, { message: 'Invalid email or password.' });
+			if (error instanceof APIError) return fail(400, { message: 'Invalid username or password.' });
 			throw error;
 		}
 		redirect(303, '/');

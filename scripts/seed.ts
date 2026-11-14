@@ -13,7 +13,7 @@ try {
 		migrateDatabase(db);
 		const summary = await seedDatabase(db);
 		console.log(
-			`Queued ${summary.feeds} real feeds in ${summary.folders} folders for ${DEV_USER.email}. ` +
+			`Queued ${summary.feeds} real feeds in ${summary.folders} folders for ${DEV_USER.username}. ` +
 				'See scripts/seed-data.ts for the dev login. Start the dev server: its scheduler pulls them within a minute.'
 		);
 		if (process.argv.includes('--refresh')) {

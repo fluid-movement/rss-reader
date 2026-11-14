@@ -1,11 +1,10 @@
-import type { User, Session } from 'better-auth';
-
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
 	namespace App {
 		interface Locals {
-			user?: User;
+			// `username` comes from Better Auth's username plugin.
+			user?: User & { username?: string | null };
 			session?: Session;
 		}
 

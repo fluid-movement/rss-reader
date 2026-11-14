@@ -309,7 +309,7 @@
 		<div class="flex min-w-0 items-center gap-2">
 			<div class="min-w-0 flex-1">
 				<p class="truncate text-sm font-medium">{data.user.name}</p>
-				<p class="truncate text-xs text-muted-foreground">{data.user.email}</p>
+				<p class="truncate text-xs text-muted-foreground">{data.user.username}</p>
 			</div>
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger

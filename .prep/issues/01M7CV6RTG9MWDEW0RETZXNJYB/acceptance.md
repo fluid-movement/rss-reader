@@ -1,5 +1,5 @@
-- [ ] Login form takes username + password, no email field anywhere in the UI, CLI or README
-- [ ] Better Auth username plugin used; drizzle migration committed and applies cleanly on a database with existing users
-- [ ] create-user command takes --username, rejects duplicates, generates the internal email
-- [ ] Existing passkey sign-in and Settings passkey management still work for username users (test coverage)
-- [ ] check, lint, unit tests and build pass
+- [x] Login form takes username + password, no email field anywhere in the UI, CLI or README
+- [x] Better Auth username plugin used; drizzle migration committed and applies cleanly on a database with existing users
+- [x] create-user command takes --username, rejects duplicates, generates the internal email
+- [x] Existing passkey sign-in and Settings passkey management still work for username users (test coverage)
+- [x] check, lint, unit tests and build pass

@@ -19,7 +19,7 @@ import {
 let connection: ReturnType<typeof connectDatabase>;
 const origin = 'http://localhost:5301';
 const credentials = {
-	email: 'reader@example.com',
+	username: 'reader',
 	name: 'Reader',
 	password: 'a-long-test-password'
 };
@@ -38,7 +38,7 @@ describe('console-created users and authentication', () => {
 	it('creates a credential with a hashed password, defaults, and a working session', async () => {
 		const created = await createConsoleUser(connection.db, {
 			...credentials,
-			email: ' READER@example.com '
+			username: ' READER '
 		});
 		const stored = connection.db.select().from(account).get()!;
 		expect(stored.password).not.toBe(credentials.password);
@@ -49,7 +49,15 @@ describe('console-created users and authentication', () => {
 			readerWidth: 720
 		});
 		const instance = auth();
-		const response = await instance.api.signInEmail({ body: credentials, asResponse: true });
+		expect(connection.db.select().from(user).get()).toMatchObject({
+			username: 'reader',
+			displayUsername: 'READER',
+			email: `${created.id}@users.invalid`
+		});
+		const response = await instance.api.signInUsername({
+			body: { username: 'Reader', password: credentials.password },
+			asResponse: true
+		});
 		expect(response.status).toBe(200);
 		const cookie = response.headers.get('set-cookie')!.split(';')[0];
 		const active = await instance.api.getSession({ headers: new Headers({ cookie }) });
@@ -71,7 +79,7 @@ describe('console-created users and authentication', () => {
 		expect(connection.db.select().from(user).all()).toHaveLength(0);
 		await createConsoleUser(connection.db, credentials);
 		await expect(
-			instance.api.signInEmail({ body: { ...credentials, password: 'wrong-password' } })
+			instance.api.signInUsername({ body: { ...credentials, password: 'wrong-password' } })
 		).rejects.toThrow();
 	});
 
@@ -79,10 +87,13 @@ describe('console-created users and authentication', () => {
 		await createConsoleUser(connection.db, credentials);
 		await expect(createConsoleUser(connection.db, credentials)).rejects.toThrow();
 		await expect(
+			createConsoleUser(connection.db, { ...credentials, username: 'READER' })
+		).rejects.toThrow('already taken');
+		await expect(
 			createConsoleUser(connection.db, { ...credentials, password: 'short' })
 		).rejects.toThrow();
 		await expect(
-			createConsoleUser(connection.db, { ...credentials, email: 'invalid' })
+			createConsoleUser(connection.db, { ...credentials, username: 'no spaces' })
 		).rejects.toThrow();
 		expect(connection.db.select().from(user).all()).toHaveLength(1);
 		expect(connection.db.select().from(account).all()).toHaveLength(1);
@@ -103,6 +114,19 @@ describe('console-created users and authentication', () => {
 		);
 		expect(registration.status).toBe(401);
 	});
+
+	it('lets a username session register and list passkeys', async () => {
+		await createConsoleUser(connection.db, credentials);
+		const instance = auth();
+		const signIn = await instance.api.signInUsername({ body: credentials, asResponse: true });
+		const headers = new Headers({ cookie: signIn.headers.get('set-cookie')!.split(';')[0] });
+		const options = await instance.handler(
+			new Request(`${origin}/api/auth/passkey/generate-register-options`, { headers })
+		);
+		expect(options.status).toBe(200);
+		expect(await options.json()).toMatchObject({ challenge: expect.any(String) });
+		expect(await instance.api.listPasskeys({ headers })).toEqual([]);
+	});
 });
 
 describe('generated migrations and reader schema', () => {
@@ -115,7 +139,7 @@ describe('generated migrations and reader schema', () => {
 	it('isolates feed subscriptions and GUIDs, enforces item state uniqueness and cascades user data', async () => {
 		const db = connection.db;
 		const owner = await createConsoleUser(db, credentials);
-		const other = await createConsoleUser(db, { ...credentials, email: 'other@example.com' });
+		const other = await createConsoleUser(db, { ...credentials, username: 'other' });
 		const folder = db.insert(folders).values({ userId: owner.id, name: 'News' }).returning().get();
 		const feed = db
 			.insert(feeds)
@@ -166,7 +190,7 @@ describe('generated migrations and reader schema', () => {
 				backedUp: false
 			})
 			.run();
-		await auth().api.signInEmail({ body: credentials });
+		await auth().api.signInUsername({ body: credentials });
 		db.delete(user).where(eq(user.id, owner.id)).run();
 		for (const table of [folders, itemState, passkey, session])
 			expect(db.select().from(table).all()).toHaveLength(0);

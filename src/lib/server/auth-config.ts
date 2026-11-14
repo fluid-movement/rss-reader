@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth/minimal';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { username } from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
 import type { AppDatabase } from './db/connect';
 
@@ -11,6 +12,6 @@ export function createAuth(db: AppDatabase, origin: string, secret: string) {
 		secret,
 		database: drizzleAdapter(db, { provider: 'sqlite' }),
 		emailAndPassword: { enabled: true, disableSignUp: true },
-		plugins: [passkey({ rpID: url.hostname, origin: url.origin, rpName: 'RSS Reader' })]
+		plugins: [username(), passkey({ rpID: url.hostname, origin: url.origin, rpName: 'RSS Reader' })]
 	});
 }

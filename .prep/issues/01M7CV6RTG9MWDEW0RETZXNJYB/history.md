@@ -1,0 +1,1 @@
+- 2026-11-14T11:00:32Z claude-code: Implemented, ready for check: username plugin, login by username, backfilling migration 0003, --username create-user/seed/e2e, username shown instead of email, README updated, tests added.

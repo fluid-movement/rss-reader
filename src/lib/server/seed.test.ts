@@ -127,7 +127,9 @@ describe('seedDatabase', () => {
 		const second = await seedDatabase(db);
 		expect(snapshot(db)).toEqual(before);
 		expect(second.userId).not.toBe(first.userId);
-		expect(db.select().from(user).where(eq(user.email, DEV_USER.email)).all()).toHaveLength(1);
+		expect(db.select().from(user).where(eq(user.username, DEV_USER.username)).all()).toHaveLength(
+			1
+		);
 		client.close();
 	});
 

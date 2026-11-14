@@ -12,12 +12,12 @@ Install dependencies with `pnpm install`. Copy `.env.example` to `.env` and conf
 There is no public sign-up. Create users from the application root, without running the web server:
 
 ```sh
-pnpm user:create --email reader@example.com --name 'Reader' --password 'a-long-unique-password'
+pnpm user:create --username reader --name 'Reader' --password 'a-long-unique-password'
 ```
 
-The command loads `.env`, applies migrations to `DATABASE_URL`, hashes the password with Better Auth, and atomically creates the user, credential and default settings. Passwords must contain 8–128 characters. Duplicate emails fail without changing the existing user. Command-line passwords can appear in shell history/process listings; run this only from a trusted administrator console and handle history accordingly.
+The command loads `.env`, applies migrations to `DATABASE_URL`, hashes the password with Better Auth, and atomically creates the user, credential and default settings. Passwords must contain 8–128 characters. Usernames are case-insensitive (3–30 letters, digits, underscores or dots); duplicates fail without changing the existing user. Command-line passwords can appear in shell history/process listings; run this only from a trusted administrator console and handle history accordingly.
 
-Start the app with `pnpm dev --port 5301 --strictPort` (set `ORIGIN=http://localhost:5301` for this example), then sign in at `/login`. All app routes require a session except `/login`, `/health`, static assets and Better Auth's `/api/auth/*` routes. Public email sign-up is disabled. The login page supports email/password and passkey sign-in; authenticated passkey enrollment/management UI is handled separately. Passkey registration endpoints require an existing session. Sign out using the root page's logout form (`POST /?/logout`).
+Start the app with `pnpm dev --port 5301 --strictPort` (set `ORIGIN=http://localhost:5301` for this example), then sign in at `/login`. All app routes require a session except `/login`, `/health`, static assets and Better Auth's `/api/auth/*` routes. Public sign-up is disabled. The login page supports username/password and passkey sign-in; authenticated passkey enrollment/management UI is handled separately. Passkey registration endpoints require an existing session. Sign out using the root page's logout form (`POST /?/logout`).
 
 ## Development seed data
 
@@ -144,7 +144,7 @@ The Debian slim multi-stage image contains only production dependencies, includi
 Create the first user from a trusted administrator console after deployment (replace `<container>` with the running container's name or ID):
 
 ```sh
-docker exec <container> node --import tsx scripts/create-user.ts --email reader@example.com --name 'Reader' --password 'a-long-unique-password'
+docker exec <container> node --import tsx scripts/create-user.ts --username reader --name 'Reader' --password 'a-long-unique-password'
 ```
 
 The command runs the script directly with the bundled `tsx` loader rather than `pnpm user:create`, because pnpm cannot download or write its cache as the non-root user at runtime. It inherits the container environment; no `.env` file is included in the image. It applies migrations and writes to the same mounted database. Public sign-up remains disabled. Command-line passwords may be visible in shell history/process listings. Retention is a per-user database setting, defaulting to **30 days**, not an environment variable.
@@ -156,7 +156,7 @@ Copy `.env.example` to `.env`, set `BETTER_AUTH_SECRET`, and set `ORIGIN=http://
 ```sh
 docker compose up --build -d --wait
 curl --fail http://localhost:5311/health
-docker compose exec app node --import tsx scripts/create-user.ts --email reader@example.com --name 'Reader' --password 'a-long-unique-password'
+docker compose exec app node --import tsx scripts/create-user.ts --username reader --name 'Reader' --password 'a-long-unique-password'
 docker compose down
 ```
 

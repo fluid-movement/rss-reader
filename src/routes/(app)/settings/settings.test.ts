@@ -44,8 +44,8 @@ beforeEach(() => {
 	db.delete(user).run();
 	db.insert(user)
 		.values([
-			{ id: 'a', name: 'A', email: 'a@example.com' },
-			{ id: 'b', name: 'B', email: 'b@example.com' }
+			{ id: 'a', name: 'A', email: 'a@example.com', username: 'a' },
+			{ id: 'b', name: 'B', email: 'b@example.com', username: 'b' }
 		])
 		.run();
 	db.insert(userSettings).values({ userId: 'b' }).run();
