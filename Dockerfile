@@ -24,7 +24,10 @@ RUN node --input-type=module -e "import Database from 'better-sqlite3'; const db
 
 FROM base AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATABASE_URL=/data/app.db
-RUN mkdir -p /data && chown node:node /data
+# curl is needed by Coolify's rolling-update healthcheck, which runs inside the container.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /data && chown node:node /data
 COPY --from=production-deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY --from=build /app/build ./build
