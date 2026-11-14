@@ -1,0 +1,21 @@
+---
+title: Username + password login, drop email from the UI
+kind: code
+priority: high
+---
+
+Sign-in uses a username and password. Email is never asked for, shown or stored from user input.
+
+Decision (user, 2026-11-14): use Better Auth's `username` plugin. Better Auth's core user table requires a unique, non-null `email`, so the column stays in the schema but holds a generated internal value (`<user id>@users.invalid`) that no UI, form, CLI flag or log exposes. Do not fork the schema or patch Better Auth. The app never sends mail.
+
+Scope:
+- Server: add the Better Auth `username` plugin in `src/lib/server/auth-config.ts` (and `authClient` in `src/lib/auth-client.ts`); regenerate the Better Auth drizzle schema (`username`, `displayUsername` columns) and add a committed drizzle migration (`pnpm db:generate`, never `db:push`). The migration must be safe on a database that has existing users: backfill a username for them, then enforce uniqueness.
+- Login page: replace the Email field with Username; sign in via the username plugin; update the description text. The passkey button stays as is.
+- Console command (`scripts/create-user.ts`, `src/lib/server/create-user.ts`): `--username` replaces `--email`; keep `--name` and `--password`. Reject duplicates, normalise the username the way the plugin does, generate the internal email. Update the README (env/user creation, Coolify section) and `.env.example` if they mention email.
+- Everywhere the UI or loaders show or return `user.email` (for example `src/routes/(app)/+layout.server.ts`, the sidebar), show the username instead.
+- Seed (`scripts/seed-data.ts`) creates its dev user with a username.
+- Passkeys: management in Settings and sign-in already exist; they must keep working unchanged with username users.
+
+Out of scope: public sign-up, password reset, email verification, changing the passkey UI.
+
+## Open questions
