@@ -1,0 +1,3 @@
+- [x] Light and dark tokens use a warm low-chroma tint; no pure white or near-black backgrounds, no saturated sidebar blue
+- [x] Foreground/background and muted-foreground/background contrast are at least 4.5:1 in both themes
+- [x] theme-color meta, manifest and offline page match the new backgrounds; tests pass

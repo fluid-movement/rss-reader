@@ -127,8 +127,8 @@ describe('PWA manifest and icons', () => {
 			start_url: '/',
 			scope: '/',
 			display: 'standalone',
-			theme_color: '#ffffff',
-			background_color: '#ffffff'
+			theme_color: '#f9f6f1',
+			background_color: '#f9f6f1'
 		});
 		expect(manifest.description).toBeTruthy();
 		expect(manifest.icons).toEqual(

@@ -1,0 +1,1 @@
+Edit the oklch tokens in src/routes/layout.css (:root, .dark); hue about 65-85, chroma 0.006-0.012. Light bg #f9f6f1, dark bg #1d1a17 (oklch 0.975 0.008 85 and 0.22 0.008 65); mirror them in src/app.html theme-color metas, static/manifest.webmanifest, static/offline.html and src/lib/pwa.test.ts. No new components.
