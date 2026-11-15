@@ -1,0 +1,2 @@
+- [x] Deployed as a single container on Coolify and healthy at https://rss.fluid-movement.de
+- [x] Installed and working as a phone PWA
