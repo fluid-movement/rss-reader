@@ -1,0 +1,2 @@
+- [x] No bg/text/fill palette colours (amber, yellow, blue, white) outside the theme tokens in app components
+- [x] check, tests and build pass

@@ -284,8 +284,7 @@
 	<!-- One wrapper element: the title and description containers are flex boxes with a gap. -->
 	<span
 		>{#each segments as segment, index (index)}{#if segment.match}<mark
-					class="rounded-sm bg-yellow-200 text-foreground dark:bg-yellow-500/40"
-					>{segment.text}</mark
+					class="rounded-sm bg-primary/20 text-foreground">{segment.text}</mark
 				>{:else}{segment.text}{/if}{/each}</span
 	>
 {/snippet}
@@ -418,7 +417,7 @@
 											</span>
 											<span class="flex shrink-0 items-center gap-2">
 												{#if isStarred(article)}<Star
-														class="size-3.5 fill-current text-amber-500"
+														class="size-3.5 fill-current text-primary"
 														aria-label="Starred"
 													/>{/if}
 												{#if article.publishedAt}<time datetime={article.publishedAt.toISOString()}

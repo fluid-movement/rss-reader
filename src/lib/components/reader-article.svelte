@@ -188,7 +188,7 @@
 				<Button variant="ghost" size="sm" aria-pressed={isStarred(selected)} onclick={toggleStar}
 					><Star
 						data-icon="inline-start"
-						class={isStarred(selected) ? 'fill-current text-amber-500' : ''}
+						class={isStarred(selected) ? 'fill-current text-primary' : ''}
 					/>{isStarred(selected) ? 'Starred' : 'Star'}</Button
 				>
 				<Button variant="ghost" size="sm" onclick={toggleRead}
@@ -290,7 +290,7 @@
 			aria-label="Star"
 			aria-pressed={isStarred(selected)}
 			onclick={toggleStar}
-			><Star class={isStarred(selected) ? 'fill-current text-amber-500' : ''} /></Button
+			><Star class={isStarred(selected) ? 'fill-current text-primary' : ''} /></Button
 		>
 		<Button
 			variant="ghost"

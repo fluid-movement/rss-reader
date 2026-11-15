@@ -209,13 +209,13 @@
 </script>
 
 <div role="listitem" class="relative overflow-hidden rounded-lg">
-	<!-- The coloured action revealed under the row while it is dragged. -->
+	<!-- The action revealed under the row while it is dragged. -->
 	<div aria-hidden="true" class="pointer-events-none absolute inset-0 flex items-center">
 		{#if offset > 0}
 			<div
-				class="flex h-full w-full items-center justify-start text-sm font-medium text-white {committed
-					? 'bg-blue-600'
-					: 'bg-blue-500/70'}"
+				class="flex h-full w-full items-center justify-start text-sm font-medium {committed
+					? 'bg-primary text-primary-foreground'
+					: 'bg-muted text-muted-foreground'}"
 			>
 				<span class="flex w-24 shrink-0 flex-col items-center gap-1 text-center">
 					{#if read}<Mail class="size-5" />Unread{:else}<MailOpen class="size-5" />Read{/if}
@@ -223,9 +223,9 @@
 			</div>
 		{:else if offset < 0}
 			<div
-				class="flex h-full w-full items-center justify-end text-sm font-medium text-white {committed
-					? 'bg-amber-600'
-					: 'bg-amber-500/70'}"
+				class="flex h-full w-full items-center justify-end text-sm font-medium {committed
+					? 'bg-primary text-primary-foreground'
+					: 'bg-muted text-muted-foreground'}"
 			>
 				<span class="flex w-24 shrink-0 flex-col items-center gap-1 text-center">
 					{#if starred}<StarOff class="size-5" />Unstar{:else}<Star class="size-5" />Star{/if}
