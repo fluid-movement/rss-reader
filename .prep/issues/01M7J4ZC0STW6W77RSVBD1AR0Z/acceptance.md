@@ -1,5 +1,5 @@
-- [ ] Dragging shows the neighbouring article beside the current one; no blank or flashing frame on commit or snap back
-- [ ] Commit settles with a velocity-aware animation, then the URL switches (replace) with no visible re-mount; skeleton pane if neighbour data is not ready
-- [ ] Buttons and keyboard next/previous animate through the same settle
-- [ ] Edge guard, horizontal-owner exclusion, rubber band at list ends, reduced motion and per-article scroll position still work
-- [ ] swipe-navigation tests updated; check, tests and build pass
+- [x] Dragging shows the neighbouring article beside the current one; no blank or flashing frame on commit or snap back
+- [x] Commit settles with a velocity-aware animation, then the URL switches (replace) with no visible re-mount; skeleton pane if neighbour data is not ready
+- [x] Buttons and keyboard next/previous animate through the same settle
+- [x] Edge guard, horizontal-owner exclusion, rubber band at list ends, reduced motion and per-article scroll position still work
+- [x] swipe-navigation tests updated; check, tests and build pass
