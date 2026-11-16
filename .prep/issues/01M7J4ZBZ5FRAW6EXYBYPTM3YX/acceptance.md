@@ -1,0 +1,3 @@
+- [x] Row collapses (slide, ~200ms) instead of vanishing when it leaves the list; rows below animate up
+- [x] No animation with prefers-reduced-motion
+- [x] check, tests and build pass

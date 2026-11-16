@@ -1,0 +1,1 @@
+src/lib/components/article-row.svelte (root div: add out:slide|local) and the each block in src/lib/components/reader-workspace.svelte (~line 396: animate:flip needs a keyed each with the animated element as direct child). Use svelte/transition and svelte/animate; guard duration with matchMedia reduced motion. Rows must not stay clickable while collapsing.

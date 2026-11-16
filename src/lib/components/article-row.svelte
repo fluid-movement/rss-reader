@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { slide } from 'svelte/transition';
 	import { toast } from 'svelte-sonner';
 	import {
 		ArrowDownToLine,
@@ -50,6 +51,9 @@
 	const LONG_PRESS_MS = 500;
 	const LONG_PRESS_SLOP = 10;
 	const MAX_OFFSET = 140;
+	/** The row collapses this long when it leaves the list (for example read in Unread). */
+	const COLLAPSE_MS = 220;
+	const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 	let menuOpen = $state(false);
 	let offset = $state(0);
@@ -208,7 +212,11 @@
 	let belowUnread = $derived(menuOpen ? below().some((row) => !row.read) : true);
 </script>
 
-<div role="listitem" class="relative overflow-hidden rounded-lg">
+<div
+	role="listitem"
+	class="relative overflow-hidden rounded-lg"
+	out:slide|local={{ duration: reducedMotion() ? 0 : COLLAPSE_MS }}
+>
 	<!-- The action revealed under the row while it is dragged. -->
 	<div aria-hidden="true" class="pointer-events-none absolute inset-0 flex items-center">
 		{#if offset > 0}

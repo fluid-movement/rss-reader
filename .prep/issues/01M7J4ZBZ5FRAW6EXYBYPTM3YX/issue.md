@@ -1,0 +1,8 @@
+---
+title: Collapse list rows when they leave the list
+kind: code
+---
+
+When an article stops matching the current list (for example swiping or marking an article read on the Unread list), its row currently vanishes instantly. Animate it: the row collapses with Svelte's slide transition (about 200ms) and the rows below glide up (animate:flip on the each block). Respect prefers-reduced-motion. Applies to every list view that removes rows (unread, starred unstar, etc.).
+
+## Open questions
