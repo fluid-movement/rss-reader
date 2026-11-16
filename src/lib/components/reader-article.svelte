@@ -19,24 +19,84 @@
 	import { shareArticle } from '#lib/share.ts';
 	import { safeOriginalLink } from '#lib/shortcuts.ts';
 	import { listHref } from '#lib/reader-paths.ts';
-	import { moveArticle, preloadNeighbors, readerPosition } from '#lib/shortcut-handler.svelte.ts';
-	import { swipeNavigation, type Step } from '#lib/swipe-navigation.ts';
+	import {
+		moveArticle,
+		neighborItem,
+		openAdjacentArticle,
+		preloadNeighbors,
+		readerNeighbors,
+		readerPosition,
+		rememberArticle,
+		setArticlePager
+	} from '#lib/shortcut-handler.svelte.ts';
+	import { resetStrip, settleStrip, swipeNavigation, type Step } from '#lib/swipe-navigation.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { isRead, isStarred, updateArticle } from '#lib/reader-state.svelte.ts';
-	import type { ReaderItemData } from '#lib/reader.ts';
+	import type { ReaderItem, ReaderItemData } from '#lib/reader.ts';
 	let { data }: { data: ReaderItemData } = $props();
 	let sharing = $state(false);
 	let cameFromList = $state(false);
 	let selected = $derived(data.selectedItem);
 	let position = $derived(readerPosition());
-	let navigating = false;
-	async function step(direction: Step) {
-		if (navigating) return false;
-		navigating = true;
+	let neighbors = $derived(readerNeighbors(selected.id));
+	// The panes of the strip: the open article between its neighbours, each keyed by article
+	// id so a neighbour keeps its DOM (and scroll) when it becomes the open article.
+	let panes = $derived(
+		[
+			neighbors.previous && neighbors.previous !== selected.id
+				? { id: neighbors.previous, rel: -1 }
+				: null,
+			{ id: selected.id, rel: 0 },
+			neighbors.next && neighbors.next !== selected.id
+				? { id: neighbors.next, rel: 1 }
+				: neighbors.more
+					? { id: 'more', rel: 1 }
+					: null
+		].filter((pane) => pane !== null)
+	);
+	let strip: HTMLElement | null = null;
+	let turning = false;
+	/** One page turn at a time: settle the strip onto the neighbour, then switch the route. */
+	async function turn(direction: Step, settle: () => Promise<void>) {
+		if (turning) return false;
+		turning = true;
 		try {
-			return await moveArticle(direction);
+			await settle();
+			const moved = await openAdjacentArticle(direction);
+			if (!moved && strip) await settleStrip(strip, 0);
+			return moved;
 		} finally {
-			navigating = false;
+			turning = false;
 		}
+	}
+	// Buttons and keys page through the same settle animation as a swipe.
+	$effect(() =>
+		setArticlePager((direction) => {
+			const node = strip;
+			const allowed = direction === 1 ? position.canNext : position.canPrevious;
+			if (!node || !allowed) return openAdjacentArticle(direction);
+			return turn(direction, () => settleStrip(node, direction));
+		})
+	);
+	const step = (direction: Step) => moveArticle(direction);
+	// The panes are re-laid-out around the new article in this same flush, so dropping the
+	// strip's offset here never shows a frame in between.
+	$effect.pre(() => {
+		void selected.id;
+		untrack(() => {
+			if (strip) resetStrip(strip);
+			collapsed = false;
+			scrollAnchor = 0;
+		});
+	});
+	// Keep the open article's data for when it becomes a neighbour, and warm the next ones.
+	$effect(() => {
+		const item = selected;
+		untrack(() => rememberArticle(item));
+		preloadNeighbors();
+	});
+	function paneItem(id: string) {
+		return id === selected.id ? selected : neighborItem(id);
 	}
 	let original = $derived(safeOriginalLink(selected.link));
 	let backHref = $derived(listHref(data));
@@ -46,23 +106,28 @@
 	let barFocused = $state(false);
 	let scrollAnchor = 0;
 	let scrollArticleId = '';
-	let scroller: HTMLElement | null = null;
+	// Each pane scrolls on its own; the open article's scroller is the one scroll state follows.
+	const scrollers: Record<string, HTMLElement> = {};
+	const scroller = () => scrollers[selected.id] ?? null;
 	snapshot({
 		id: 'reader-article-scroll',
-		capture: () => ({ id: selected.id, top: scroller?.scrollTop ?? 0 }),
+		capture: () => ({ id: selected.id, top: scroller()?.scrollTop ?? 0 }),
 		restore: (value) => {
-			if (scroller && value.id === selected.id) {
-				scroller.scrollTop = value.top;
+			const node = scroller();
+			if (node && value.id === selected.id) {
+				node.scrollTop = value.top;
 				scrollAnchor = value.top;
 			}
 		},
 		reset: () => {
-			if (scroller) scroller.scrollTop = 0;
+			const node = scroller();
+			if (node) node.scrollTop = 0;
 			scrollAnchor = 0;
 			collapsed = false;
 		}
 	});
-	function trackScroll(event: Event) {
+	function trackScroll(event: Event, id: string) {
+		if (id !== selected.id) return;
 		const el = event.currentTarget as HTMLElement;
 		if (scrollArticleId !== selected.id) {
 			scrollArticleId = selected.id;
@@ -134,6 +199,41 @@
 		}
 	}
 </script>
+
+{#snippet articleBody(item: ReaderItem)}
+	<header class="flex min-w-0 flex-col gap-4">
+		<p class="text-sm font-medium text-muted-foreground">{item.feedTitle}</p>
+		<h1 class="text-3xl leading-tight font-semibold tracking-tight break-words sm:text-4xl">
+			{item.title}
+		</h1>
+		<div class="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
+			{#if item.author}<span>{item.author}</span>{/if}{#if item.publishedAt}<time
+					datetime={item.publishedAt.toISOString()}>{dateLabel(item.publishedAt)}</time
+				>{/if}
+		</div>
+	</header>
+	<!-- Only the server-sanitized article body may be rendered as HTML. -->
+	<FullTextArticle {item}>
+		{#snippet body(html)}
+			{#key html}
+				<div
+					class="article-prose"
+					{@attach (node) =>
+						enhanceArticle(
+							node,
+							(next) => {
+								image = next;
+							},
+							safeOriginalLink(item.link)
+						)}
+				>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is sanitized by sanitize-html on the server. -->
+					{@html html}
+				</div>
+			{/key}
+		{/snippet}
+	</FullTextArticle>
+{/snippet}
 
 <section aria-label="Article reader" class="relative flex h-full min-w-0 flex-col">
 	<header
@@ -209,66 +309,61 @@
 			</div>
 		</div>
 	</header>
-	<!-- Keyed so each article opens scrolled to its top. -->
-	{#key selected.id}
+	<!-- Strip pager: previous, open and next article sit side by side and the finger drags the whole strip. -->
+	<div class="relative min-h-0 flex-1 overflow-hidden">
 		<div
-			data-reader-scroller
-			class="reader-scroll min-h-0 min-w-0 flex-1 overflow-y-auto"
-			onscroll={trackScroll}
-			{@attach (node) =>
-				swipeNavigation(node, () => ({
-					canStep: (direction) => (direction === 1 ? position.canNext : position.canPrevious),
-					commit: step,
-					warm: preloadNeighbors
-				}))}
+			class="absolute inset-0 will-change-transform"
 			{@attach (node) => {
-				scroller = node;
-				collapsed = false;
-				scrollAnchor = 0;
+				strip = node;
+				const detach = swipeNavigation(node, () => ({
+					canStep: (direction) => (direction === 1 ? position.canNext : position.canPrevious),
+					commit: turn,
+					warm: preloadNeighbors,
+					busy: () => turning
+				}));
 				return () => {
-					if (scroller === node) scroller = null;
+					detach();
+					if (strip === node) strip = null;
 				};
 			}}
 		>
-			<article
-				class="reader-content mx-auto flex w-full max-w-[var(--reader-width,720px)] min-w-0 flex-col gap-7 px-5 py-8 sm:px-10 lg:py-14"
-			>
-				<header class="flex min-w-0 flex-col gap-4">
-					<p class="text-sm font-medium text-muted-foreground">{selected.feedTitle}</p>
-					<h1 class="text-3xl leading-tight font-semibold tracking-tight break-words sm:text-4xl">
-						{selected.title}
-					</h1>
-					<div class="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
-						{#if selected.author}<span>{selected.author}</span>{/if}{#if selected.publishedAt}<time
-								datetime={selected.publishedAt.toISOString()}
-								>{dateLabel(selected.publishedAt)}</time
-							>{/if}
-					</div>
-				</header>
-				<!-- Only the server-sanitized article body may be rendered as HTML. -->
-				<FullTextArticle item={selected}>
-					{#snippet body(html)}
-						{#key html}
-							<div
-								class="article-prose"
-								{@attach (node) =>
-									enhanceArticle(
-										node,
-										(next) => {
-											image = next;
-										},
-										original
-									)}
-							>
-								<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is sanitized by sanitize-html on the server. -->
-								{@html html}
+			{#each panes as pane (pane.id)}
+				{@const item = paneItem(pane.id)}
+				{@const open = pane.id === selected.id}
+				<div
+					data-reader-scroller={open ? '' : undefined}
+					class="reader-scroll absolute inset-y-0 w-full min-w-0 overflow-y-auto"
+					style:left="{pane.rel * 100}%"
+					inert={!open}
+					aria-hidden={open ? undefined : 'true'}
+					onscroll={(event) => trackScroll(event, pane.id)}
+					{@attach (node) => {
+						scrollers[pane.id] = node;
+						return () => {
+							if (scrollers[pane.id] === node) delete scrollers[pane.id];
+						};
+					}}
+				>
+					<article
+						class="reader-content mx-auto flex w-full max-w-[var(--reader-width,720px)] min-w-0 flex-col gap-7 px-5 py-8 sm:px-10 lg:py-14"
+					>
+						{#if item}
+							{@render articleBody(item)}
+						{:else}
+							<div class="flex min-w-0 flex-col gap-4" role="status" aria-label="Loading article">
+								<Skeleton class="h-4 w-1/4" />
+								<Skeleton class="h-9 w-full" />
+								<Skeleton class="h-9 w-2/3" />
+								<Skeleton class="mt-6 h-4 w-full" />
+								<Skeleton class="h-4 w-full" />
+								<Skeleton class="h-4 w-5/6" />
 							</div>
-						{/key}
-					{/snippet}
-				</FullTextArticle>
-			</article>
+						{/if}
+					</article>
+				</div>
+			{/each}
 		</div>
-	{/key}
+	</div>
 	<!-- Phone action bar in the thumb zone; the top toolbar keeps back and title context. -->
 	<div
 		class="reader-bar flex items-center justify-around border-t bg-background sm:hidden"

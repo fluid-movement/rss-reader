@@ -12,7 +12,7 @@ export type Step = -1 | 1;
 export interface SwipeMove {
 	/** 'vertical' and 'ignored' gestures belong to the browser; never move the article. */
 	phase: 'ignored' | 'pending' | 'vertical' | 'horizontal';
-	/** Pixels the article should follow the finger (rubber-banded when there is nowhere to go). */
+	/** Pixels the strip should follow the finger (rubber-banded when there is nowhere to go). */
 	offset: number;
 	/** The article change this drag would commit, 0 when none. */
 	step: Step | 0;
@@ -32,6 +32,7 @@ export class SwipeTracker {
 	#startX = 0;
 	#startY = 0;
 	#samples: { x: number; t: number }[] = [];
+	#velocity = 0;
 
 	constructor(
 		private readonly options: {
@@ -40,9 +41,15 @@ export class SwipeTracker {
 		}
 	) {}
 
+	/** Horizontal speed in px/ms (signed) at the last release; 0 after a cancel or a new touch. */
+	get releaseVelocity() {
+		return this.#velocity;
+	}
+
 	/** Returns false (and tracks nothing) when the gesture must be left to the browser. */
 	down(x: number, y: number, time: number, blocked = false): boolean {
 		this.cancel();
+		this.#velocity = 0;
 		if (blocked || isEdgeStart(x, this.options.viewportWidth())) return false;
 		this.#active = true;
 		this.#startX = x;
@@ -80,6 +87,7 @@ export class SwipeTracker {
 			velocity = span > 0 ? (x - first.x) / span : 0;
 		}
 		this.cancel();
+		this.#velocity = velocity;
 		if (!horizontal) return 0;
 		const step = articleStep(gestureDirection(dx, 0, 'horizontal'));
 		if (step === 0 || !this.options.canStep(step)) return 0;
@@ -108,19 +116,76 @@ export function startsInHorizontalOwner(target: Element | null, root: Element): 
 	return false;
 }
 
-export interface SwipeNavigationOptions {
-	canStep: (step: Step) => boolean;
-	/** Resolves true when the article changed. Called after the slide-out finishes. */
-	commit: (step: Step) => Promise<boolean>;
-	/** Touch start: warm the neighbors. */
-	warm?: () => void;
+const MIN_SETTLE_MS = 120;
+const MAX_SETTLE_MS = 320;
+/** Slowest speed (px/ms) the settle assumes, so a gentle release is not dragged out. */
+const MIN_SETTLE_SPEED = 0.9;
+
+/** Settle time for covering `distance` px: a faster release lands sooner, within a fixed range. */
+export function settleDuration(distance: number, velocity: number) {
+	const speed = Math.max(Math.abs(velocity), MIN_SETTLE_SPEED);
+	return Math.round(Math.min(MAX_SETTLE_MS, Math.max(MIN_SETTLE_MS, Math.abs(distance) / speed)));
 }
 
-const DURATION = 160;
-/** Direction the next-mounted article slides in from (set when a swipe commits). */
-let entering: Step | 0 = 0;
+const SETTLE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const animations = new WeakMap<HTMLElement, Animation>();
 
-/** Svelte attachment: horizontal swipe paging on `node` (touch pointers only). */
+function reducedMotion() {
+	return matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function offsetOf(node: HTMLElement) {
+	return new DOMMatrixReadOnly(getComputedStyle(node).transform).m41;
+}
+
+/** Animate the strip from where it is to `to` px (a transform-only animation) and resolve
+ * when it lands. Resolves at once under reduced motion or when it is already there. */
+export function slideStrip(node: HTMLElement, to: number, velocity = 0): Promise<void> {
+	const from = offsetOf(node);
+	animations.get(node)?.cancel();
+	animations.delete(node);
+	node.style.transform = to ? `translate3d(${to}px,0,0)` : '';
+	if (reducedMotion() || from === to) return Promise.resolve();
+	return new Promise((resolve) => {
+		const animation = node.animate(
+			[{ transform: `translate3d(${from}px,0,0)` }, { transform: `translate3d(${to}px,0,0)` }],
+			{ duration: settleDuration(to - from, velocity), easing: SETTLE_EASING }
+		);
+		animations.set(node, animation);
+		animation.onfinish = () => {
+			if (animations.get(node) === animation) animations.delete(node);
+			resolve();
+		};
+	});
+}
+
+/** Settle the strip onto the neighbour in `step` direction (-1 previous, 1 next), or back to
+ * the open article with 0. Used by swipes, buttons and keys alike. */
+export function settleStrip(node: HTMLElement, step: Step | 0, velocity = 0) {
+	const width = node.clientWidth || window.innerWidth;
+	return slideStrip(node, -step * width, velocity);
+}
+
+/** Drop any strip animation and transform (the panes have been re-laid-out around the new article). */
+export function resetStrip(node: HTMLElement) {
+	animations.get(node)?.cancel();
+	animations.delete(node);
+	node.style.transform = '';
+}
+
+export interface SwipeNavigationOptions {
+	canStep: (step: Step) => boolean;
+	/** Called once a swipe is released over the threshold. `settle` slides the strip onto the
+	 * neighbour; run it, then switch the route. Resolves true when the article changed. */
+	commit: (step: Step, settle: () => Promise<void>) => Promise<boolean>;
+	/** Touch start: warm the neighbors. */
+	warm?: () => void;
+	/** True while a page turn is already in flight: new touches are left alone. */
+	busy?: () => boolean;
+}
+
+/** Svelte attachment: horizontal swipe paging. `node` is the strip holding the previous,
+ * open and next panes side by side; the finger drags the whole strip (touch pointers only). */
 export function swipeNavigation(node: HTMLElement, options: () => SwipeNavigationOptions) {
 	const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 	const tracker = new SwipeTracker({
@@ -130,22 +195,7 @@ export function swipeNavigation(node: HTMLElement, options: () => SwipeNavigatio
 	let pointerId: number | null = null;
 	let dragging = false;
 	let lastSwipeEnd = 0;
-	let animation: Animation | null = null;
 
-	const slide = (from: number, to: number, done?: () => void) => {
-		animation?.cancel();
-		node.style.transform = to ? `translate3d(${to}px,0,0)` : '';
-		if (reduced.matches || from === to) {
-			done?.();
-			return;
-		}
-		animation = node.animate(
-			[{ transform: `translate3d(${from}px,0,0)` }, { transform: `translate3d(${to}px,0,0)` }],
-			{ duration: DURATION, easing: 'ease-out' }
-		);
-		animation.onfinish = () => done?.();
-	};
-	const currentOffset = () => new DOMMatrixReadOnly(getComputedStyle(node).transform).m41;
 	const hasSelection = () => {
 		const selection = getSelection();
 		return !!selection && !selection.isCollapsed && selection.toString().length > 0;
@@ -155,20 +205,11 @@ export function swipeNavigation(node: HTMLElement, options: () => SwipeNavigatio
 		dragging = false;
 	};
 	const abort = () => {
-		const offset = dragging ? currentOffset() : 0;
 		const wasDragging = dragging;
 		tracker.cancel();
 		reset();
-		if (wasDragging) slide(offset, 0);
+		if (wasDragging) void slideStrip(node, 0);
 	};
-
-	// A freshly opened article (the scroller is re-created per article) slides in after a swipe.
-	if (entering && !reduced.matches) {
-		const from = entering * (window.innerWidth || node.clientWidth);
-		entering = 0;
-		slide(from, 0);
-	}
-	entering = 0;
 
 	function onDown(event: PointerEvent) {
 		if (event.pointerType !== 'touch') return;
@@ -177,9 +218,17 @@ export function swipeNavigation(node: HTMLElement, options: () => SwipeNavigatio
 			abort();
 			return;
 		}
+		if (options().busy?.()) return;
 		const blocked = hasSelection() || startsInHorizontalOwner(event.target as Element, node);
 		if (!tracker.down(event.clientX, event.clientY, event.timeStamp, blocked)) return;
 		pointerId = event.pointerId;
+		// Grabbing a strip that is still settling stops it where the finger caught it.
+		if (animations.has(node)) {
+			const caught = offsetOf(node);
+			animations.get(node)?.cancel();
+			animations.delete(node);
+			node.style.transform = caught ? `translate3d(${caught}px,0,0)` : '';
+		}
 		options().warm?.();
 	}
 	function onMove(event: PointerEvent) {
@@ -196,7 +245,7 @@ export function swipeNavigation(node: HTMLElement, options: () => SwipeNavigatio
 		}
 		if (!dragging) {
 			dragging = true;
-			animation?.cancel();
+			animations.get(node)?.cancel();
 			try {
 				node.setPointerCapture(event.pointerId);
 			} catch {
@@ -208,25 +257,19 @@ export function swipeNavigation(node: HTMLElement, options: () => SwipeNavigatio
 	function onUp(event: PointerEvent) {
 		if (event.pointerId !== pointerId) return;
 		const wasDragging = dragging;
-		const offset = wasDragging && !reduced.matches ? currentOffset() : 0;
 		const step = tracker.up(event.clientX, event.timeStamp);
+		const velocity = tracker.releaseVelocity;
 		reset();
 		if (wasDragging) lastSwipeEnd = performance.now();
 		if (!step) {
-			if (wasDragging) slide(offset, 0);
+			if (wasDragging) void slideStrip(node, 0, velocity);
 			return;
 		}
-		// Slide out, switch, and the next article slides in from the other side.
-		const width = node.clientWidth || window.innerWidth;
-		slide(offset, -step * width, () => {
-			entering = step;
-			void options()
-				.commit(step)
-				.then((changed) => {
-					entering = 0;
-					if (!changed) slide(-step * width, 0);
-				});
-		});
+		void options()
+			.commit(step, () => settleStrip(node, step, velocity))
+			.then((changed) => {
+				if (!changed) void slideStrip(node, 0);
+			});
 	}
 	function onClick(event: MouseEvent) {
 		// A drag that ends over a link must not also activate it.
@@ -247,7 +290,6 @@ export function swipeNavigation(node: HTMLElement, options: () => SwipeNavigatio
 		node.removeEventListener('pointerup', onUp);
 		node.removeEventListener('pointercancel', abort);
 		node.removeEventListener('click', onClick, true);
-		animation?.cancel();
-		node.style.transform = '';
+		resetStrip(node);
 	};
 }

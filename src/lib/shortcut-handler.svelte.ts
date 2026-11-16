@@ -12,7 +12,7 @@ import {
 	shouldBlurOnEscape,
 	type ShortcutAction
 } from '#lib/shortcuts.ts';
-import type { ReaderView } from '#lib/reader.ts';
+import type { ReaderItem, ReaderView } from '#lib/reader.ts';
 
 /** What the article list on screen tells the shortcut handler. Set by the reader workspace. */
 export interface ReaderShortcutContext {
@@ -131,6 +131,36 @@ export function readerPosition() {
 	};
 }
 
+/** Neighbour article data fetched by preloadData, kept so the pager can render it beside the open article. */
+let neighborItems = $state.raw<Record<string, ReaderItem>>({});
+const loadingNeighbors: Record<string, true> = {};
+const MAX_REMEMBERED = 12;
+
+/** Remember an article's data (the open one too, so it is ready as a neighbour after paging). */
+export function rememberArticle(item: ReaderItem) {
+	const next = { ...neighborItems, [item.id]: item };
+	const keys = Object.keys(next);
+	for (const key of keys.slice(0, Math.max(0, keys.length - MAX_REMEMBERED))) delete next[key];
+	neighborItems = next;
+}
+
+/** The preloaded data of a neighbour article, when it has arrived. */
+export function neighborItem(id: string): ReaderItem | undefined {
+	return neighborItems[id];
+}
+
+/** The articles beside the open one: `more` when the next one sits behind the next list page. */
+export function readerNeighbors(openId: string) {
+	const ids = context?.articleIds ?? [];
+	const index = ids.indexOf(openId);
+	if (index < 0) return { previous: null, next: null, more: false };
+	return {
+		previous: ids[index - 1] ?? null,
+		next: ids[index + 1] ?? null,
+		more: index === ids.length - 1 && !!context?.hasMore
+	};
+}
+
 /** Warm the neighbors' item data so a swipe or button lands without a spinner. */
 export function preloadNeighbors() {
 	const current = context;
@@ -138,12 +168,36 @@ export function preloadNeighbors() {
 	const index = current.articleIds.indexOf(current.selectedId);
 	if (index < 0) return;
 	for (const id of [current.articleIds[index - 1], current.articleIds[index + 1]]) {
-		if (id) void preloadData(current.hrefFor(id)).catch(() => {});
+		if (!id || neighborItems[id] || loadingNeighbors[id]) continue;
+		loadingNeighbors[id] = true;
+		void preloadData(current.hrefFor(id))
+			.then((result) => {
+				const item = result.type === 'loaded' ? result.data.selectedItem : undefined;
+				if (item && !neighborItems[id]) rememberArticle(item as ReaderItem);
+			})
+			.catch(() => {})
+			.finally(() => delete loadingNeighbors[id]);
 	}
 }
 
-/** Open the next (1) or previous (-1) article of the list. Resolves true when it moved. */
-export async function moveArticle(direction: 1 | -1): Promise<boolean> {
+type Pager = (direction: 1 | -1) => Promise<boolean>;
+let pager: Pager | null = null;
+
+/** The open reader registers its animated pager so buttons and keys share the swipe's settle. */
+export function setArticlePager(next: Pager) {
+	pager = next;
+	return () => {
+		if (pager === next) pager = null;
+	};
+}
+
+/** Open the next (1) or previous (-1) article, animated when a reader is open. */
+export function moveArticle(direction: 1 | -1): Promise<boolean> {
+	return pager ? pager(direction) : openAdjacentArticle(direction);
+}
+
+/** Navigate to the next (1) or previous (-1) article of the list. Resolves true when it moved. */
+export async function openAdjacentArticle(direction: 1 | -1): Promise<boolean> {
 	const current = context;
 	if (!current) return false;
 	let ids = current.articleIds;
