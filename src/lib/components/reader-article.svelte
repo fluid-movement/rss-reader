@@ -54,6 +54,9 @@
 					: null
 		].filter((pane) => pane !== null)
 	);
+	// Declared before the effects below: $effect.pre runs at init and assigns them.
+	let collapsed = $state(false);
+	let scrollAnchor = 0;
 	let strip: HTMLElement | null = null;
 	let turning = false;
 	/** One page turn at a time: settle the strip onto the neighbour, then switch the route. */
@@ -93,6 +96,9 @@
 	$effect(() => {
 		const item = selected;
 		untrack(() => rememberArticle(item));
+	});
+	$effect(() => {
+		void selected.id;
 		preloadNeighbors();
 	});
 	function paneItem(id: string) {
@@ -101,10 +107,8 @@
 	let original = $derived(safeOriginalLink(selected.link));
 	let backHref = $derived(listHref(data));
 	let image = $state<{ src: string; alt: string; trigger: HTMLElement } | null>(null);
-	let collapsed = $state(false);
 	let headerFocused = $state(false);
 	let barFocused = $state(false);
-	let scrollAnchor = 0;
 	let scrollArticleId = '';
 	// Each pane scrolls on its own; the open article's scroller is the one scroll state follows.
 	const scrollers: Record<string, HTMLElement> = {};
@@ -201,6 +205,8 @@
 </script>
 
 {#snippet articleBody(item: ReaderItem)}
+	<!-- A derived link: a refreshed item with the same link must not re-run the enhancer. -->
+	{@const link = safeOriginalLink(item.link)}
 	<header class="flex min-w-0 flex-col gap-4">
 		<p class="text-sm font-medium text-muted-foreground">{item.feedTitle}</p>
 		<h1 class="text-3xl leading-tight font-semibold tracking-tight break-words sm:text-4xl">
@@ -224,7 +230,7 @@
 							(next) => {
 								image = next;
 							},
-							safeOriginalLink(item.link)
+							link
 						)}
 				>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is sanitized by sanitize-html on the server. -->

@@ -120,7 +120,11 @@ test.describe('article swipes', () => {
 
 	test('ignores swipes that start inside horizontally scrolling content', async ({ page }) => {
 		await openArticle(page, WIDE_ARTICLE_NUMBER);
-		const pre = page.locator('.article-prose pre, .article-prose .article-scroll-region').first();
+		const pre = page
+			.locator(
+				'[data-reader-scroller] .article-prose pre, [data-reader-scroller] .article-prose .article-scroll-region'
+			)
+			.first();
 		await pre.scrollIntoViewIfNeeded();
 		const c = await centerOf(pre);
 		await swipe(page, { x: c.x + 100, y: c.y }, { x: c.x - 100, y: c.y });

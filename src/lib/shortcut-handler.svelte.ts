@@ -138,6 +138,7 @@ const MAX_REMEMBERED = 12;
 
 /** Remember an article's data (the open one too, so it is ready as a neighbour after paging). */
 export function rememberArticle(item: ReaderItem) {
+	if (neighborItems[item.id] === item) return;
 	const next = { ...neighborItems, [item.id]: item };
 	const keys = Object.keys(next);
 	for (const key of keys.slice(0, Math.max(0, keys.length - MAX_REMEMBERED))) delete next[key];
